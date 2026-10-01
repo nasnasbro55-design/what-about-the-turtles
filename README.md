@@ -52,3 +52,9 @@ The solution is meant to be **scalable** across multiple companies and sites, no
 - Post-competition handoff (who flies it if W.A. Hazel wants to keep using it)
 
 ## Repo structure
+turtles/
+├── architecture/ — system design, research notes
+├── detection/ — detection models, eval
+├── backend/ — API, alerting, fusion logic
+├── ui_docs/ — dashboard, docs, demo materials
+└── data/ — training/test images (not committed — see .gitignore)
