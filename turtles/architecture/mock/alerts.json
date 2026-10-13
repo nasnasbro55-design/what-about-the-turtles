@@ -1,0 +1,82 @@
+[
+  {
+    "alert_id": "F-20261025-01-A001",
+    "site_id": "grayson-mock",
+    "flight_id": "F-20261025-01",
+    "lat": 38.7601774,
+    "lon": -77.5199648,
+    "confidence": "high",
+    "score": 0.88,
+    "sensors": [
+      "rgb",
+      "thermal"
+    ],
+    "detection_ids": [
+      "F-20261025-01-d004",
+      "F-20261025-01-d003",
+      "F-20261025-01-d008"
+    ],
+    "thumbnail": "thumbnails/F-20261025-01-d004.jpg",
+    "created_at": "2026-10-25T14:22:05Z",
+    "status": "relocated",
+    "note": "Eastern box turtle, moved to woodline north of lot"
+  },
+  {
+    "alert_id": "F-20261025-01-A002",
+    "site_id": "grayson-mock",
+    "flight_id": "F-20261025-01",
+    "lat": 38.7600564,
+    "lon": -77.5200338,
+    "confidence": "high",
+    "score": 0.78,
+    "sensors": [
+      "rgb"
+    ],
+    "detection_ids": [
+      "F-20261025-01-d001",
+      "F-20261025-01-d002"
+    ],
+    "thumbnail": "thumbnails/F-20261025-01-d001.jpg",
+    "created_at": "2026-10-25T14:22:05Z",
+    "status": "open",
+    "note": ""
+  },
+  {
+    "alert_id": "F-20261025-01-A003",
+    "site_id": "grayson-mock",
+    "flight_id": "F-20261025-01",
+    "lat": 38.7604684,
+    "lon": -77.5199234,
+    "confidence": "review",
+    "score": 0.55,
+    "sensors": [
+      "rgb"
+    ],
+    "detection_ids": [
+      "F-20261025-01-d006"
+    ],
+    "thumbnail": "thumbnails/F-20261025-01-d006.jpg",
+    "created_at": "2026-10-25T14:22:05Z",
+    "status": "open",
+    "note": ""
+  },
+  {
+    "alert_id": "F-20261025-01-A004",
+    "site_id": "grayson-mock",
+    "flight_id": "F-20261025-01",
+    "lat": 38.7603351,
+    "lon": -77.5200785,
+    "confidence": "review",
+    "score": 0.41,
+    "sensors": [
+      "rgb"
+    ],
+    "detection_ids": [
+      "F-20261025-01-d005"
+    ],
+    "thumbnail": "thumbnails/F-20261025-01-d005.jpg",
+    "created_at": "2026-10-25T14:22:05Z",
+    "status": "false_positive",
+    "note": "Rock, about 15 cm"
+  }
+]

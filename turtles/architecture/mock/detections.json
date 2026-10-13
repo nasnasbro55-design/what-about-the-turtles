@@ -1,0 +1,130 @@
+[
+  {
+    "detection_id": "F-20261025-01-d001",
+    "frame_id": "F-20261025-01-f001",
+    "sensor": "rgb",
+    "bbox": [
+      2874,
+      577,
+      2926,
+      623
+    ],
+    "score": 0.78,
+    "lat": 38.7600564,
+    "lon": -77.5200338,
+    "timestamp": "2026-10-25T14:00:03Z",
+    "model_version": "rgb-v0-mock"
+  },
+  {
+    "detection_id": "F-20261025-01-d002",
+    "frame_id": "F-20261025-01-f002",
+    "sensor": "rgb",
+    "bbox": [
+      2874,
+      5401,
+      2926,
+      5447
+    ],
+    "score": 0.74,
+    "lat": 38.7600565,
+    "lon": -77.5200338,
+    "timestamp": "2026-10-25T14:00:06Z",
+    "model_version": "rgb-v0-mock"
+  },
+  {
+    "detection_id": "F-20261025-01-d003",
+    "frame_id": "F-20261025-01-f002",
+    "sensor": "rgb",
+    "bbox": [
+      5074,
+      352,
+      5126,
+      398
+    ],
+    "score": 0.83,
+    "lat": 38.7601739,
+    "lon": -77.5199681,
+    "timestamp": "2026-10-25T14:00:06Z",
+    "model_version": "rgb-v0-mock"
+  },
+  {
+    "detection_id": "F-20261025-01-d004",
+    "frame_id": "F-20261025-01-f003",
+    "sensor": "rgb",
+    "bbox": [
+      5074,
+      5177,
+      5126,
+      5223
+    ],
+    "score": 0.88,
+    "lat": 38.760174,
+    "lon": -77.5199681,
+    "timestamp": "2026-10-25T14:00:09Z",
+    "model_version": "rgb-v0-mock"
+  },
+  {
+    "detection_id": "F-20261025-01-d005",
+    "frame_id": "F-20261025-01-f004",
+    "sensor": "rgb",
+    "bbox": [
+      1374,
+      3077,
+      1426,
+      3123
+    ],
+    "score": 0.41,
+    "lat": 38.7603351,
+    "lon": -77.5200785,
+    "timestamp": "2026-10-25T14:00:12Z",
+    "model_version": "rgb-v0-mock"
+  },
+  {
+    "detection_id": "F-20261025-01-d006",
+    "frame_id": "F-20261025-01-f005",
+    "sensor": "rgb",
+    "bbox": [
+      6574,
+      2177,
+      6626,
+      2223
+    ],
+    "score": 0.55,
+    "lat": 38.7604684,
+    "lon": -77.5199234,
+    "timestamp": "2026-10-25T14:00:15Z",
+    "model_version": "rgb-v0-mock"
+  },
+  {
+    "detection_id": "F-20261025-01-d007",
+    "frame_id": "F-20261025-01-f006",
+    "sensor": "rgb",
+    "bbox": [
+      3974,
+      3977,
+      4026,
+      4023
+    ],
+    "score": 0.12,
+    "lat": 38.7605387,
+    "lon": -77.520001,
+    "timestamp": "2026-10-25T14:00:18Z",
+    "model_version": "rgb-v0-mock"
+  },
+  {
+    "detection_id": "F-20261025-01-d008",
+    "frame_id": "F-20261025-01-t001",
+    "sensor": "thermal",
+    "bbox": [
+      70,
+      48,
+      96,
+      70
+    ],
+    "score": 0.81,
+    "lat": 38.7601848,
+    "lon": -77.5199578,
+    "timestamp": "2026-10-25T14:41:10Z",
+    "model_version": "thermal-delta-v0-mock"
+  }
+]
