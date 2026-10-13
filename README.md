@@ -1,62 +1,88 @@
 # What About the Turtles
 
-**Status:** Provisional — we're in Concept Development (Weeks 3-4 of Challenge+X), not the build phase yet. Details below will firm up as hardware/approach gets finalized.
+**Finding box turtles on active construction sites before the equipment does.**
 
-This project is part of **Challenge+X, Round 3**, sponsored by **William A. Hazel, Inc.** and **Aero Animal Rescue** (Tanya Finch's turtle rescue program).
+Challenge+X Round 3 · Team TNUX · Sponsored by **William A. Hazel, Inc.** and **Aero Animal Rescue (What About the Turtles?)**
+
+**Status:** building (Weeks 5–6 of 8). Final showcase Oct 31 – Nov 7, 2026.
+
+---
 
 ## The problem
 
-Box turtles get trapped and killed on active construction sites after silt fencing goes up — they try to escape, run into the fence, and can't get back to food, water, or shelter. We're partnering with William A. Hazel and Aero Animal Rescue to catch this before it happens.
+Eastern box turtles get crushed along haul roads on construction sites, or flee to the edges and die of heat, exhaustion or predators. Sites average about 40 acres. Checking that on foot means roughly 54 km of walking, around 13 hours, for one person.
 
-## The idea
+## What we're building
 
-A drone flies a scripted pattern over a site's perimeter, capturing footage that AI models scan for turtles:
+A system that tells a crew **where and when to look**, finds turtles in drone photos, and puts them on a map so someone can move them to safety.
 
-- **RGB detection** — spots turtles by shape/pattern against dirt, debris, and grass
-- **Thermal detection** (pending validation — see Open Questions) — flags heat differentials that could be a turtle
+1. **Plan.** A flight planner combines the site's work schedule, the weather forecast, and Tanya Finch's turtle-activity knowledge. Her site-visit records show box turtles turn up on or right after rainy days. Example output: *"Fly the haul roads Saturday 9 AM. It rained Friday and it's 72°F."*
+2. **Find.** W.A. Hazel's drone photographs the site from straight above. Our detection model flags likely turtles, each with a precise GPS location.
+3. **Confirm.** A responder opens the web app on their phone, walks to the pin, and marks it *relocated* or *false alarm*. Every answer becomes new training data.
 
-When a detection is confirmed, the system alerts the site lead with a location and photo so someone can respond, consistent with how Aero Animal Rescue already works (nearest worker, ~15 min response).
+**Hardware:** W.A. Hazel's DJI Mavic 3 Enterprise, flown by their geospatial engineer Logan Lavalette (FAA Part 107). Its zoom camera gives a closer look at flagged spots without flying low. *(Pending final Hazel approval.)*
+**Thermal:** we tested a handheld thermal camera. It only shows a turtle when the turtle is warmer than the ground. Whether thermal is part of this season's demo is still being decided.
+**Test site:** Grayson Overlook, Gainesville, VA. Tanya's records show 6 box turtles found there in June 2026.
 
-## Site scale
+## What we deliver on Nov 7
 
-Confirmed by W.A. Hazel: average site is **40 acres**, roughly **1 mile of perimeter** to cover. This is why a drone patrol is a stronger fit than a fixed-camera grid — covering that distance with stationary cameras would take 15-50+ units.
+- **The app:** drone photos in, turtle pins on a map, responder buttons.
+- **The planner:** recommended flight times and zones.
+- **Proof:** results from a real flight at Grayson (found X of Y).
+- **The pitch and a demo video.**
 
-The solution is meant to be **scalable** across multiple companies and sites, not a one-off for W.A. Hazel specifically.
+## Team
 
-## Team — TNUX
-
-| Name | Role | Responsibilities |
-|---|---|---|
-| **Nasrullah "Naz" Hussain** (lead, POC) | Technical lead / pilot | Drone & thermal feasibility research, FAA Part 107 study + certification, drone pilot for demo, system architecture, fusion logic design, main contact with Tanya/John |
-| **Jake Dwight Chan Israel** | Detection models | Builds and evaluates the RGB object-detection model on real turtle photos, builds the thermal detection model once validation data exists, owns the eval harness scoring both |
-| **Ethan Cooper** | Backend & alerts | Ingests drone footage/frames, runs the fusion logic, turns a detection into a real-time alert, builds the API, reviews/merges PRs |
-| **Huy Ngoc Minh Truong** | Flight logistics & presentation | Flight logistics and safety documentation, dashboard (visualizing flagged detections), demo video, docs, candidate for CAD/3D-printing work |
-
-## Schedule (Challenge+X program weeks)
-
-| Week | Dates | Phase | What we're doing |
+| Name | Role | Works in | Starts with |
 |---|---|---|---|
-| 1 | Sep 12-18 | Kickoff & Team Formation | Done |
-| 2 | Sep 19-25 | Challenge Deep Dive & Early Mentorship | Done |
-| 3-4 | Sep 26-Oct 9 | **Concept Development & Sponsor Check-ins** | **← We are here.** Finalizing approach, thermal validation, FAA cert prep, site visit scheduling |
-| 5-6 | Oct 10-23 | Iteration & Real-World Validation | Build detection models, drone pipeline, alert system; first flight test |
-| 7 | Oct 24-30 | Final Build & Pitch Prep | Polish, dashboard, rehearse pitch |
-| 8 | Oct 31-Nov 7 | Final Showcase & Awards | Demo day |
+| Nasrullah (Naz) Hussain | Team lead, architecture, flight planner, sponsor contact | `turtles/planner/`, `turtles/contracts.py` | [Planner brief](turtles/planner/README.md) |
+| Jake Dwight Chan Israel | Turtle detection model + evaluation | `turtles/detection/` | [Detection brief](turtles/detection/README.md) |
+| Ethan Cooper | Backend: photo ingest, alert logic, API | `turtles/backend/` | [Backend brief](turtles/backend/README.md) |
+| Huy Ngoc Minh Truong | Web app (map + alerts) and demo video | `turtles/ui_docs/` | [App brief](turtles/ui_docs/README.md) |
+| Logan Lavalette (W.A. Hazel) | Drone pilot | – | – |
 
-## Open questions (resolving during concept development)
+**Everyone, read first:** [`turtles/architecture/ARCHITECTURE.md`](turtles/architecture/ARCHITECTURE.md). It covers how the pieces connect and the data formats we all share.
 
-- Thermal feasibility on turtles (ectotherms don't generate body heat — testing before committing to hardware)
-- Final hardware: buy a drone, or borrow one through GMU's Autonomous Swarms club
-- FAA Part 107 certification path and timeline
-- Drone flight permission over an active W.A. Hazel site
-- Post-competition handoff (who flies it if W.A. Hazel wants to keep using it)
+## Schedule
+
+| Week | Dates | Phase | Our milestones |
+|---|---|---|---|
+| 1–2 | Sep 12 – 25 | Kickoff, deep dive | Sponsor meetings, photo archive review |
+| 3–4 | Sep 26 – Oct 9 | Concept development | Thermal test, concept locked |
+| **5–6** | **Oct 10 – 23** | **Iteration and real-world validation** ← we are here | **Oct 16:** data formats frozen · **Oct 20:** each piece works on fake data · **Oct 23:** full pipeline works without the drone |
+| 5–6 | Sat Oct 17 or 24 (TBD) | Site visit | Grayson flight with Logan |
+| 7 | Oct 24 – 30 | Final build and pitch prep | **Oct 30:** demo freeze, demo video recorded |
+| 8 | Oct 31 – Nov 7 | Final showcase | Pitch |
+
+## Quick start
+
+```
+git clone https://github.com/nasnasbro55-design/what-about-the-turtles.git
+cd what-about-the-turtles
+python3 -m turtles.contracts        # checks the fake data matches our shared formats
+pip3 install pytest && python3 -m pytest -q
+```
+
+There's fake but realistic data in `turtles/architecture/mock/` (alerts, detections, zones, flight windows), so everyone can build without waiting on the drone.
 
 ## Repo structure
-~~~
+
+```
 turtles/
-+-- architecture/   - system design, research notes
-+-- detection/      - detection models, eval
-+-- backend/        - API, alerting, fusion logic
-+-- ui_docs/        - dashboard, docs, demo materials
-+-- data/           - training/test images (not committed - see .gitignore)
-~~~
+├── contracts.py      shared data formats (everyone imports these)
+├── geo.py            photo pixel -> GPS location math
+├── architecture/     ARCHITECTURE.md + mock data
+├── planner/          Naz: where and when to fly
+├── detection/        Jake: turtle detection model
+├── backend/          Ethan: ingest, alert logic, API
+├── ui_docs/          Huy: web app, demo materials
+└── data/             real photos (never committed; shared through Drive)
+tests/                python3 -m pytest -q
+```
+
+## Working rules
+
+- Pull before you start (`git pull --rebase`). Never `git push --force`.
+- Changing anything in `turtles/contracts.py` needs the whole team's OK.
+- No photos or personal data in the repo. Site imagery belongs to W.A. Hazel.
+- No purchases without W.A. Hazel's written approval first.
