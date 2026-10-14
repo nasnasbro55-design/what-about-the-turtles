@@ -4,8 +4,9 @@ from pathlib import Path
 import pytest
 
 from turtles.backend.fusion import fuse
-from turtles.contracts import Alert, Confidence, Detection, Frame, Sensor, from_dict, load
+from turtles.contracts import Alert, Confidence, Detection, FlightWindow, Frame, Sensor, Zone, from_dict, load
 from turtles.geo import distance_m, pixel_to_latlon
+from turtles.planner.planner import urgency
 
 MOCK = Path(__file__).resolve().parents[1] / "turtles" / "architecture" / "mock"
 
@@ -19,6 +20,23 @@ def test_mock_files_match_contracts():
     assert len(load(Frame, MOCK / "frames.json")) == 7
     assert len(load(Detection, MOCK / "detections.json")) == 8
     assert len(load(Alert, MOCK / "alerts.json")) == 4
+
+
+def test_planner_mocks_and_urgency():
+    assert len(load(Zone, MOCK / "zones.json")) == 3
+    windows = load(FlightWindow, MOCK / "windows.json")
+    assert [w.priority for w in windows] == sorted((w.priority for w in windows), reverse=True)
+    assert [urgency(h) for h in (-1, 10, 48, 100, 500)] == [0.0, 1.0, 0.7, 0.4, 0.1]
+
+
+def test_heatmap_mock_is_valid_geojson():
+    import json
+    fc = json.loads((MOCK / "heatmap.geojson").read_text())
+    assert fc["type"] == "FeatureCollection" and fc["features"]
+    for f in fc["features"]:
+        ring = f["geometry"]["coordinates"][0]
+        assert f["geometry"]["type"] == "Polygon" and ring[0] == ring[-1]
+        assert 0 <= f["properties"]["likelihood"] <= 1 and isinstance(f["properties"]["reasons"], list)
 
 
 def test_unknown_field_is_rejected():

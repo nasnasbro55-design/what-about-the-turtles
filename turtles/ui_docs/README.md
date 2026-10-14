@@ -16,6 +16,13 @@ Read [`../architecture/ARCHITECTURE.md`](../architecture/ARCHITECTURE.md) sectio
    - A **Navigate** button that opens Google Maps at the pin's lat/lon.
    - Buttons: **Confirmed**, **Relocated**, **False positive**. Each sends `PATCH /alerts/{id}` with `{"status": ..., "note": ...}`.
 
+4. **Next flights panel:** the planner's recommendations from `GET /plan` (`mock/windows.json` for now).
+   - Best first: zone name, day and time, a thermal badge if `thermal_ok`, and the `reasons` as bullets.
+   - On the map, draw each work zone from `GET /zones` (`mock/zones.json`) as a shaded area labeled with its work and start date, like "Clearing, Tue 7 AM".
+   - This is what makes the pitch "we find turtles **before** the bulldozer gets there," so give it a prominent spot.
+
+5. **Heat map layer (stretch, after screens 1–4 work):** a toggle on the map that shades cells from `GET /heatmap` (`mock/heatmap.geojson` for now) by `likelihood`. Leaflet's `L.geoJSON` with a style function does this in a few lines. Show `reasons` on tap.
+
 ## Data
 
 - **Start today** with `turtles/architecture/mock/alerts.json`. It has 4 alerts covering every case (high with thermal, high from two photos, review, false positive).
