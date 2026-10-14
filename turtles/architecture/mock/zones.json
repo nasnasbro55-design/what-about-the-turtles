@@ -1,0 +1,77 @@
+[
+  {
+    "zone_id": "Z1",
+    "site_id": "grayson-mock",
+    "name": "North lot",
+    "polygon": [
+      [
+        38.7598,
+        -77.5208
+      ],
+      [
+        38.7598,
+        -77.5192
+      ],
+      [
+        38.7606,
+        -77.5192
+      ],
+      [
+        38.7606,
+        -77.5208
+      ]
+    ],
+    "work": "clearing",
+    "work_starts": "2026-10-27T11:00:00Z"
+  },
+  {
+    "zone_id": "Z2",
+    "site_id": "grayson-mock",
+    "name": "East woodline buffer",
+    "polygon": [
+      [
+        38.7598,
+        -77.5192
+      ],
+      [
+        38.7598,
+        -77.5185
+      ],
+      [
+        38.7606,
+        -77.5185
+      ],
+      [
+        38.7606,
+        -77.5192
+      ]
+    ],
+    "work": "grading",
+    "work_starts": "2026-10-29T11:00:00Z"
+  },
+  {
+    "zone_id": "Z3",
+    "site_id": "grayson-mock",
+    "name": "South laydown yard",
+    "polygon": [
+      [
+        38.759,
+        -77.5208
+      ],
+      [
+        38.759,
+        -77.5185
+      ],
+      [
+        38.7598,
+        -77.5185
+      ],
+      [
+        38.7598,
+        -77.5208
+      ]
+    ],
+    "work": "staging",
+    "work_starts": "2026-11-05T12:00:00Z"
+  }
+]

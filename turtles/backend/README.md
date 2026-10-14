@@ -22,7 +22,9 @@ photo folder -> ingest.py -> list[Frame] -> detector.detect() -> list[Detection]
 2. **Fake detector.** Until Jake's model is ready, use a `detect()` that returns `mock/detections.json` so the whole pipeline runs end to end now.
 3. **Storage.** One SQLite file with `frames`, `detections`, and `alerts` tables mirroring `contracts.py`.
 4. **API.** Use FastAPI with the endpoints in ARCHITECTURE section 6. Turn CORS on so Huy's web app can call it.
-5. **Thumbnails.** Crop the best detection's bbox (plus some padding) from its photo, save it as `thumbnails/<detection_id>.jpg`, and serve it.
+5. **Planner endpoints.** `GET /plan?site_id=` returns `turtles.planner.plan(...)` (serve `mock/windows.json` until Naz's planner is ready), and `GET /zones?site_id=` returns the site's work zones (`mock/zones.json` for now).
+6. **Heat map (stretch).** `GET /heatmap?site_id=` returns a GeoJSON file as-is (`mock/heatmap.geojson` for now).
+7. **Thumbnails.** Crop the best detection's bbox (plus some padding) from its photo, save it as `thumbnails/<detection_id>.jpg`, and serve it.
 
 ## Milestones
 

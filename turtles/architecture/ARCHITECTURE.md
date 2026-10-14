@@ -28,12 +28,18 @@ This is how thermal was actually validated (handheld, close range). It also keep
 
 **Hardware change:** don't buy a clamp mount. Buy one FLIR One for handheld use; the cheaper plug-in FLIR One Pro is fine for this.
 
+> **Update (Oct 13): Plan A, pending Logan.** We may instead rent a **DJI Mavic 3 Thermal**, which has both a 48 MP regular camera and a 640×512 thermal camera built in. That puts thermal in the air for real: at 8–10 m, a turtle shows up as a hot spot of about 9 pixels, captured at the same moment and GPS position as the regular photo.
+>
+> **None of the contracts change either way.** Aerial thermal frames are just `sensor: "thermal"` frames with an altitude, and fusion already treats regular-plus-thermal agreement as high confidence. If Plan A happens, only this section, the capture spec (section 7), and Jake's thermal reader (DJI thermal JPEGs instead of FLIR) change. The handheld design above is Plan B.
+
 ---
 
 ## 1. How it works end to end
 
 ```mermaid
 flowchart LR
+    P["Flight planner<br/>work schedule + weather"] -->|"where + when to fly"| A
+    P --> G
     A["Drone survey<br/>RGB photos + GPS"] --> B["Ingest<br/>EXIF to Frame"]
     B --> C["RGB detector<br/>Frame to Detection"]
     C --> D["Fusion<br/>Detections to Alerts"]
@@ -56,6 +62,8 @@ flowchart LR
 | Component | Owner | Code | Input | Output |
 |---|---|---|---|---|
 | Flight + capture spec, contracts, integration | Naz | `turtles/contracts.py`, `turtles/geo.py`, this doc | - | - |
+| **Flight planner**: where and when to survey | Naz | `turtles/planner/` ([brief](../planner/README.md)) | `Zone`s + weather forecast + Tanya's activity rules | `list[FlightWindow]` |
+| *Stretch:* turtle-likelihood heat map + "couldn't see here" coverage map | Naz | `turtles/planner/` | free NAIP NDVI imagery, haul roads/edges, our alerts, survey photos | GeoJSON layers |
 | Flying the drone | Logan (W.A. Hazel, Part 107 certified) | - | capture spec (section 7) | folder of photos |
 | Ingest | Ethan | `turtles/backend/ingest.py` | photo folder | `list[Frame]` |
 | RGB + thermal detection | Jake | `turtles/detection/detector.py` | `Frame` + image | `list[Detection]` |
@@ -73,7 +81,8 @@ turtles/
 ├── geo.py              pixel -> lat/lon, distances, camera field-of-view values
 ├── architecture/
 │   ├── ARCHITECTURE.md this file
-│   └── mock/           frames.json, detections.json, alerts.json: fake but consistent data to build against
+│   └── mock/           frames, detections, alerts, zones, windows (.json): fake but consistent data to build against
+├── planner/            Naz: where and when to fly (work schedule + weather)
 ├── detection/          Jake: detector.py, training, eval
 ├── backend/            Ethan: ingest.py, fusion.py, api.py
 ├── ui_docs/            Huy: web app, demo materials
@@ -149,6 +158,9 @@ Ethan builds this; Huy consumes it. Suggested stack: FastAPI + SQLite, run on a 
 | `PATCH` | `/alerts/{alert_id}` | `{"status": "...", "note": "..."}` | updated `Alert` |
 | `POST` | `/alerts/{alert_id}/thermal` | thermal image + phone lat/lon | re-fused `Alert` (stretch) |
 | `GET` | `/thumbnails/{file}` | - | JPEG crop |
+| `GET` | `/plan?site_id=` | - | `[FlightWindow]` best first (calls `turtles.planner.plan`) |
+| `GET` | `/zones?site_id=` | - | `[Zone]` for drawing work areas on the map |
+| `GET` | `/heatmap?site_id=` | - | GeoJSON `FeatureCollection` of grid cells with `likelihood` 0-1 and `reasons` (stretch; `mock/heatmap.geojson` until ready) |
 
 Until this exists, Huy builds against `mock/alerts.json`. Switching later is a one-line change of base URL.
 
@@ -207,9 +219,9 @@ How we deal with it:
 | Date | Everyone can see… |
 |---|---|
 | **Thu Oct 16** | Contracts agreed in Discord; nobody is blocked. |
-| **Mon Oct 20** | Each piece runs alone on mock data. Jake: `detect()` returns Detections on 20 labeled photos. Ethan: `GET /alerts` serves the mock alerts and `PATCH` saves. Huy: map + list render from `mock/alerts.json`. |
+| **Mon Oct 20** | Each piece runs alone on mock data. Jake: `detect()` returns Detections on 20 labeled photos. Ethan: `GET /alerts` serves the mock alerts and `PATCH` saves. Huy: map + list render from `mock/alerts.json`. Naz: the planner ranks forecast hours for the mock zones. |
 | **Fri Oct 23** (end of Week 6) | **End to end without a drone:** a folder of photos goes through ingest, detect, fuse, the API, and shows up in the web app. |
-| **Weekend, date TBD** with Tanya + Logan | Grayson site flight. Run real photos through the system, measure recall, retrain. |
+| **Weekend, date TBD** with Tanya + Logan | Grayson site flight, **at the time the planner picks**. Run real photos through the system, measure recall, retrain. Note whether thermal matched the planner's prediction. |
 | **Thu Oct 30** | Demo freeze. Record a full run on real flight data. |
 | **Oct 31 – Nov 7** | Showcase. **Never depend on a live flight on stage.** Replay real flight data through the live system. |
 
@@ -224,3 +236,6 @@ How we deal with it:
 | Who carries the handheld FLIR on site: Tanya's responders, site crew, or us? | Naz → Tanya |
 | Alerts beyond the web app (SMS/email for high-confidence alerts)? Stretch goal. | Ethan |
 | Exact FAA registration steps for the Grayson airspace | Waiting on Logan |
+| Rent a DJI Mavic 3 Thermal (Plan A) or go handheld thermal (Plan B)? | Naz → Logan |
+| Grayson work schedule: which zones get cleared or graded, and when (planner input) | Naz → Tanya/Logan |
+| Turtle activity patterns + past sightings (planner rules) | Naz → Tanya |

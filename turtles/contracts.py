@@ -4,7 +4,8 @@ Every component reads and writes these shapes:
     ingest   (Ethan) -> Frame
     detector (Jake)  -> Detection
     fusion   (Ethan) -> Alert
-    dashboard (Huy)  <- Alert, as JSON from the API
+    planner  (Naz)   -> FlightWindow, from Zone + weather forecast
+    dashboard (Huy)  <- Alert and FlightWindow, as JSON from the API
 
 Change a field here only after the team agrees - it breaks everyone downstream.
 Times are ISO 8601 UTC strings ("2026-10-25T14:03:11Z"). Coordinates are WGS84 decimal degrees.
@@ -86,6 +87,30 @@ class Alert:
     note: str = ""
 
 
+@dataclass
+class Zone:
+    """A part of the site with scheduled work, from W.A. Hazel's schedule. Drawn on the map."""
+    zone_id: str
+    site_id: str
+    name: str
+    polygon: list[list[float]]  # [[lat, lon], ...]
+    work: str                   # "clearing", "grading", "staging", ...
+    work_starts: str            # when equipment arrives
+
+
+@dataclass
+class FlightWindow:
+    """Planner output: a recommended time to survey one zone. Shown in the app, best first."""
+    window_id: str
+    site_id: str
+    zone_id: str
+    start: str
+    end: str
+    priority: float      # 0-1, higher = fly this first
+    thermal_ok: bool     # planner expects turtles to stand out on thermal in this window
+    reasons: list[str]   # plain English, shown to Logan / the site manager
+
+
 _ENUMS = {"sensor": Sensor, "confidence": Confidence, "status": Status}
 
 
@@ -110,5 +135,6 @@ def dump(items, path) -> None:
 
 if __name__ == "__main__":
     mock = Path(__file__).parent / "architecture" / "mock"
-    for cls, name in ((Frame, "frames"), (Detection, "detections"), (Alert, "alerts")):
+    for cls, name in ((Frame, "frames"), (Detection, "detections"), (Alert, "alerts"),
+                      (Zone, "zones"), (FlightWindow, "windows")):
         print(f"{name}.json: {len(load(cls, mock / f'{name}.json'))} records match the contract")

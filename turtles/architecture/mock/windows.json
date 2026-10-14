@@ -1,0 +1,43 @@
+[
+  {
+    "window_id": "W-20261025-1",
+    "site_id": "grayson-mock",
+    "zone_id": "Z1",
+    "start": "2026-10-25T20:30:00Z",
+    "end": "2026-10-25T22:00:00Z",
+    "priority": 0.92,
+    "thermal_ok": true,
+    "reasons": [
+      "Clearing starts Tue Oct 27, 7:00 AM (in 2 days)",
+      "Sunny afternoon, then the ground cools before sunset: good thermal window",
+      "Dry, light wind"
+    ]
+  },
+  {
+    "window_id": "W-20261026-1",
+    "site_id": "grayson-mock",
+    "zone_id": "Z1",
+    "start": "2026-10-26T14:00:00Z",
+    "end": "2026-10-26T16:00:00Z",
+    "priority": 0.71,
+    "thermal_ok": false,
+    "reasons": [
+      "Clearing starts tomorrow, 7:00 AM: last chance before equipment arrives",
+      "Overcast: turtles likely match ground temperature, so RGB only",
+      "Dry, wind 4 m/s"
+    ]
+  },
+  {
+    "window_id": "W-20261025-2",
+    "site_id": "grayson-mock",
+    "zone_id": "Z2",
+    "start": "2026-10-25T20:30:00Z",
+    "end": "2026-10-25T22:00:00Z",
+    "priority": 0.58,
+    "thermal_ok": true,
+    "reasons": [
+      "Grading starts Thu Oct 29, 7:00 AM",
+      "Same thermal window as North lot: fly it second if battery allows"
+    ]
+  }
+]
