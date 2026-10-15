@@ -48,8 +48,8 @@ The backend calls only these two functions. As long as they return valid `Detect
 
 | Date | Done means |
 |---|---|
-| Thu Oct 16 | At least 50 boxes labeled; you've read the contracts and raised any problems |
-| Mon Oct 20 | `detect()` returns real Detections on 20 photos (any quality) |
+| Fri Oct 16 | At least 50 boxes labeled; you've read the contracts and raised any problems |
+| Tue Oct 20 | `detect()` returns real Detections on 20 photos (any quality) |
 | Fri Oct 23 | First eval numbers; detector plugged into Ethan's pipeline |
 | After Grayson flight | Retrained on real aerial photos, new eval numbers |
 

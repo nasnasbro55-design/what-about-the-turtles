@@ -35,15 +35,15 @@ Read [`../architecture/ARCHITECTURE.md`](../architecture/ARCHITECTURE.md) sectio
 
 - A 2–3 minute demo video: drone flight footage, then alerts popping up on the map, then a responder confirming one.
 - Screenshots for the slides.
-- Recorded on real Grayson flight data once we have it, by Thu Oct 30.
+- Recorded on real Grayson flight data once we have it, by Fri Oct 30.
 
 ## Milestones
 
 | Date | Done means |
 |---|---|
-| Thu Oct 16 | Wireframe sketch posted in Discord (paper photo is fine) |
-| Mon Oct 20 | Map + list + detail render from `mock/alerts.json`, and it works on your phone |
+| Fri Oct 16 | Wireframe sketch posted in Discord (paper photo is fine) |
+| Tue Oct 20 | Map + list + detail render from `mock/alerts.json`, and it works on your phone |
 | Fri Oct 23 | Wired to Ethan's API; status buttons actually save |
-| Thu Oct 30 | Demo video recorded |
+| Fri Oct 30 | Demo video recorded |
 
 **Don't worry about:** models, the drone, or the backend internals.
