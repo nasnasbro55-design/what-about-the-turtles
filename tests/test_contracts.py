@@ -5,7 +5,7 @@ import pytest
 
 from turtles.backend.fusion import fuse
 from turtles.contracts import Alert, Confidence, Detection, FlightWindow, Frame, Sensor, Zone, from_dict, load
-from turtles.geo import distance_m, pixel_to_latlon
+from turtles.geo import distance_m, nadir_yaw, pixel_to_latlon
 from turtles.planner.planner import urgency
 
 MOCK = Path(__file__).resolve().parents[1] / "turtles" / "architecture" / "mock"
@@ -53,6 +53,13 @@ def test_pixel_direction_follows_heading():
     assert lat == pytest.approx(38.76) and lon > -77.52
     lat, lon = pixel_to_latlon(frame(yaw=90), 8000, 3024)  # right edge, facing east -> south
     assert lat < 38.76 and lon == pytest.approx(-77.52)
+
+
+def test_nadir_yaw_handles_dji_flip():
+    # real values from Logan's Sept 29 Grayson photos: same orientation reported two ways
+    assert nadir_yaw(-155.9, 0.0) == pytest.approx(-155.9)
+    assert nadir_yaw(24.1, 180.0) == pytest.approx(-155.9)
+    assert nadir_yaw(170.0, 0.0) == pytest.approx(170.0)
 
 
 def test_distance():

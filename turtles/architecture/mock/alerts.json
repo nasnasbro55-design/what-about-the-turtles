@@ -3,8 +3,8 @@
     "alert_id": "F-20261025-01-A001",
     "site_id": "grayson-mock",
     "flight_id": "F-20261025-01",
-    "lat": 38.7601774,
-    "lon": -77.5199648,
+    "lat": 38.7601787,
+    "lon": -77.5199661,
     "confidence": "high",
     "score": 0.88,
     "sensors": [
@@ -25,8 +25,8 @@
     "alert_id": "F-20261025-01-A002",
     "site_id": "grayson-mock",
     "flight_id": "F-20261025-01",
-    "lat": 38.7600564,
-    "lon": -77.5200338,
+    "lat": 38.7600584,
+    "lon": -77.5200343,
     "confidence": "high",
     "score": 0.78,
     "sensors": [
@@ -45,8 +45,8 @@
     "alert_id": "F-20261025-01-A003",
     "site_id": "grayson-mock",
     "flight_id": "F-20261025-01",
-    "lat": 38.7604684,
-    "lon": -77.5199234,
+    "lat": 38.7604701,
+    "lon": -77.519923,
     "confidence": "review",
     "score": 0.55,
     "sensors": [
@@ -64,8 +64,8 @@
     "alert_id": "F-20261025-01-A004",
     "site_id": "grayson-mock",
     "flight_id": "F-20261025-01",
-    "lat": 38.7603351,
-    "lon": -77.5200785,
+    "lat": 38.7603361,
+    "lon": -77.5200807,
     "confidence": "review",
     "score": 0.41,
     "sensors": [
