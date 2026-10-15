@@ -30,8 +30,8 @@ photo folder -> ingest.py -> list[Frame] -> detector.detect() -> list[Detection]
 
 | Date | Done means |
 |---|---|
-| Thu Oct 16 | `GET /alerts` serves `mock/alerts.json`; Huy can hit it |
-| Mon Oct 20 | `PATCH /alerts/{id}` saves status to SQLite; `ingest_flight()` reads a sample DJI photo |
+| Fri Oct 16 | `GET /alerts` serves `mock/alerts.json`; Huy can hit it |
+| Tue Oct 20 | `PATCH /alerts/{id}` saves status to SQLite; `ingest_flight()` reads a sample DJI photo |
 | Fri Oct 23 | `POST /flights` runs ingest → detect → fuse on a folder and the alerts show up in Huy's app |
 
 **Stretch:** text or email to the responder when a `high` alert is created.

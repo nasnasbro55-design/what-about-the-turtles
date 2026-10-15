@@ -1,6 +1,6 @@
 # System Architecture: What About the Turtles
 
-**Status:** v1 draft, Oct 13, 2026. Owner: Naz. **Read it and raise objections by Thu Oct 16.** After that, the contracts in section 4 are frozen and changes need everyone's OK.
+**Status:** v1 draft, Oct 13, 2026. Owner: Naz. **Read it and raise objections by Fri Oct 16.** After that, the contracts in section 4 are frozen and changes need everyone's OK.
 
 Each person also has a starter brief in their own folder:
 - Jake: [`turtles/detection/README.md`](../detection/README.md)
@@ -231,11 +231,11 @@ How we deal with it:
 
 | Date | Everyone can see… |
 |---|---|
-| **Thu Oct 16** | Contracts agreed in Discord; nobody is blocked. |
-| **Mon Oct 20** | Each piece runs alone on mock data. Jake: `detect()` returns Detections on 20 labeled photos. Ethan: `GET /alerts` serves the mock alerts and `PATCH` saves. Huy: map + list render from `mock/alerts.json`. Naz: the planner ranks forecast hours for the mock zones. |
+| **Fri Oct 16** | Contracts agreed in Discord; nobody is blocked. |
+| **Tue Oct 20** | Each piece runs alone on mock data. Jake: `detect()` returns Detections on 20 labeled photos. Ethan: `GET /alerts` serves the mock alerts and `PATCH` saves. Huy: map + list render from `mock/alerts.json`. Naz: the planner ranks forecast hours for the mock zones. |
 | **Fri Oct 23** (end of Week 6) | **End to end without a drone:** a folder of photos goes through ingest, detect, fuse, the API, and shows up in the web app. |
 | **Weekend, date TBD** with Tanya + Logan | Grayson site flight, **at the time the planner picks**. Run real photos through the system, measure recall, retrain. Note whether thermal matched the planner's prediction. |
-| **Thu Oct 30** | Demo freeze. Record a full run on real flight data. |
+| **Fri Oct 30** | Demo freeze. Record a full run on real flight data. |
 | **Oct 31 – Nov 7** | Showcase. **Never depend on a live flight on stage.** Replay real flight data through the live system. |
 
 ---

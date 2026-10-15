@@ -72,9 +72,9 @@ A map of the site and its surroundings, shaded by how likely turtles are to be t
 
 | Date | Done means |
 |---|---|
-| Thu Oct 16 | Asked Tanya for activity patterns + sightings, and the Grayson work schedule |
-| Mon Oct 20 | `fetch_forecast` + `flyable` + `urgency` working; prints ranked hours for the mock zones |
+| Fri Oct 16 | Asked Tanya for activity patterns + sightings, and the Grayson work schedule |
+| Tue Oct 20 | `fetch_forecast` + `flyable` + `urgency` working; prints ranked hours for the mock zones |
 | Fri Oct 23 | `plan()` returns `FlightWindow`s; Ethan serves them, Huy shows them |
 | Before the Grayson flight | Real zones + Tanya's rules in; the planner picks the flight time |
-| Mon Oct 27 (stretch) | Heat map from NAIP NDVI + roads/edges, served at `/heatmap` and shown in the app |
+| Tue Oct 27 (stretch) | Heat map from NAIP NDVI + roads/edges, served at `/heatmap` and shown in the app |
 | Thu Oct 29 (stretch) | Coverage map from the real Grayson photos |
