@@ -14,10 +14,21 @@ M_PER_DEG_LAT = 111_320.0
 # Mini 4 Pro; horizontal is derived from the aspect ratio. Estimates - calibrate on the
 # first flight by photographing an object of known size from a known height.
 HFOV_DEG = {
+    "m3e_wide": 70.65,             # DJI Mavic 3 Enterprise wide camera, from CalibratedFocalLength in real photos
     "mini4pro_photo_4x3": 69.7,
     "mini4pro_video_16x9": 74.4,
     "flir_one_edge_pro": 54.0,
 }
+
+
+def nadir_yaw(gimbal_yaw: float, gimbal_roll: float) -> float:
+    """Heading the top of a straight-down photo faces, in -180..180.
+
+    Pointing straight down, DJI sometimes reports the same orientation two ways: Logan's Sept 29
+    photos alternate yaw -155.9 / roll 0 and yaw +24.1 / roll 180, which are the same picture.
+    Always pass yaw through this before pixel_to_latlon, or half the detections land mirrored.
+    """
+    return ((gimbal_yaw + 180 if abs(gimbal_roll) > 90 else gimbal_yaw) + 180) % 360 - 180
 
 
 def gsd_m(alt_m: float, hfov_deg: float, width_px: int) -> float:

@@ -115,8 +115,8 @@ Example alert, from `mock/alerts.json`:
   "alert_id": "F-20261025-01-A001",
   "site_id": "grayson-mock",
   "flight_id": "F-20261025-01",
-  "lat": 38.7601774,
-  "lon": -77.5199648,
+  "lat": 38.7601787,
+  "lon": -77.5199661,
   "confidence": "high",
   "score": 0.88,
   "sensors": ["rgb", "thermal"],
@@ -166,38 +166,51 @@ Until this exists, Huy builds against `mock/alerts.json`. Switching later is a o
 
 ---
 
-## 7. Capture spec for Logan's flights
+## 7. Capture spec for Logan's flights (DJI Mavic 3 Enterprise, verified Oct 14)
+
+**The drone:** W.A. Hazel's **DJI Mavic 3 Enterprise (M3E)**, flown by Logan. It's already registered to Hazel, so we don't register anything. Verified against real photos from Logan's Sept 29 Grayson flight:
+- Wide camera: 5280 × 3956 px, mechanical shutter (no motion blur).
+- Calibrated horizontal field of view: **70.65°**.
+- Every photo carries GPS, altitude above takeoff, gimbal angles, and exact UTC time (see `turtles/backend/ingest.py` for the tag names).
 
 **Photos, not video:**
 - Interval shooting, gimbal at −90° (straight down), steady speed.
-- Each DJI photo carries its own GPS, altitude, and heading, so ingest is easy.
-- Photos have far more pixels than video frames.
+- The live HDMI feed is about 1080p, so it's for spotting only (section 1).
 
-**How big a turtle looks:** pixels across a ~13 cm box turtle, calculated from the spec field of view. Verify on the first flight.
+**How big a 13 cm box turtle looks in an M3E wide photo:**
 
-| Height | 48 MP photo | 12 MP photo | 4K video frame |
+| Height | cm per pixel | Turtle | Each photo covers |
 |---|---|---|---|
-| 10 m | 75 px | 38 px | 33 px |
-| **15 m** | **50 px** | 25 px | 22 px |
-| 20 m | 38 px | 19 px | 16 px |
-| 30 m | 25 px | 13 px | 11 px |
+| **50 ft (15 m)** | 0.40 | **~32 px**: ask for this | 21 × 16 m |
+| 65 ft (20 m) | 0.54 | ~24 px: upper limit | 28 × 21 m |
+| 100 ft (30 m) | 0.81 | ~16 px: too small | 43 × 32 m |
+| 180 ft (55 m) | 1.48 | ~9 px | 78 × 58 m |
+| 380 ft (116 m) | 3.11 | ~4 px: Logan's mapping height | 164 × 123 m |
 
-Detectors get unreliable below about 20 px. **Target: 48 MP photos at 15 m.** If 48 MP interval shooting is too slow, use 12 MP at 10–12 m.
+Detectors get unreliable below about 20 px. **Target: ~50 ft, 65 ft max.** Logan's normal mapping flights (380 ft, 80% overlap) are great for site maps but can't show turtles.
 
-**Overlap:** at least 20% between photos, so a turtle near a photo edge shows up twice. That's what the multi-view rule in section 5 relies on.
+**Overlap:** 20–30% between photos, so a turtle near a photo edge shows up twice for the multi-view rule (section 5). That's much less than mapping needs, so the flight is quicker.
 
-**Coverage at 15 m:** each photo covers about 21 × 16 m.
-- **Perimeter band** (1 mile, one lane): about 130 photos. Quick.
-- **Full 40-acre grid:** about 770 photos, likely 1–2 batteries.
-- Which one to fly is an open question (section 10).
+**Where to fly:** haul roads and site edges first. That's where Tanya finds injured and dead turtles, and where the planner points.
 
-**Timing:**
-- RGB works in any daylight; overcast is fine and avoids harsh shadows.
-- Do the handheld thermal checks when turtles read warm against the ground: after they've basked, or early morning or evening as the ground cools (from our Oct 13 validation).
+**What the site looks like (Sept 29 photos):**
+- Red-brown bare dirt, standing puddles, tire ruts, culvert pipe stacks, and parked equipment.
+- A strip of grass and silt fence between the site and Old Carolina Rd.
+- Woods at the far edge.
+- Train on this kind of ground (section 8).
 
-**Handoff:** Logan gives us the SD card folder. It goes to `POST /flights`, or into `turtles/data/flights/<flight_id>/` until the API exists.
+**Timing:** daylight, ideally right after rain (Tanya's records), 70–80°F. The planner picks the window.
 
-**Before any flight:** the drone must be FAA-registered (waiting on Logan's details), and everyone on site needs their own PPE.
+**GPS accuracy:**
+- The Sept 29 photos are tagged `RtkFlag=16`: standard GPS, about 1–1.5 m. That's fine, since alerts group detections within 4 m.
+- With an RTK fix (`RtkFlag=50`) it would be centimeter-level.
+- Logan's flight folder also includes PPK files for centimeter post-processing. We don't need them.
+
+**Handoff:** Logan gives us the SD card folder. It goes to `POST /flights`, or into `turtles/data/flights/<flight_id>/` until the API exists. Never commit photos.
+
+**Privacy:** the photos also show neighbors' houses and cars across Old Carolina Rd. Keep imagery private, and crop to the site in the pitch and demo.
+
+**Before any flight:** everyone on site needs their own PPE and a signed W.A. Hazel waiver. Logan is the Remote Pilot in Command.
 
 ---
 
@@ -207,7 +220,7 @@ Most of Tanya's archive is phone photos taken at ground level, from the side. Th
 
 How we deal with it:
 
-1. **Ask Logan now for any existing aerial photos of W.A. Hazel sites**, even without turtles. They're perfect negative examples: dirt, debris, and equipment the model must learn to ignore.
+1. **We have Logan's Sept 29 Grayson photos** (380 ft, so no turtles are visible). They show exactly what the background looks like: red-brown dirt, puddles, ruts, pipes, equipment. Make sure the GMU top-down session includes bare brown dirt and mud. After the low flight, those real photos become our best negative examples.
 2. **Make aerial-style training photos without a drone.** Hold a phone straight down over a real turtle (for example, at a nature center), then shrink the image so the turtle is 25–60 px, matching section 7. Do the same over rocks, pinecones, and clods of dirt for negatives.
 3. **Use the archive anyway.** It still teaches shell color and pattern. Augment it with rotation, scale, and blur.
 4. **Measure recall first.** Missing a turtle is the costly mistake, while a false alarm only costs a short walk. Tune thresholds for recall.
