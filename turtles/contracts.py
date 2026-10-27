@@ -5,6 +5,7 @@ Every component reads and writes these shapes:
     detector (Jake)  -> Detection
     fusion   (Ethan) -> Alert
     planner  (Naz)   -> FlightWindow, from Zone + weather forecast
+    relocation (Naz) -> RelocationSuggestion, from an Alert + the heat map
     dashboard (Huy)  <- Alert and FlightWindow, as JSON from the API
 
 Change a field here only after the team agrees - it breaks everyone downstream.
@@ -109,6 +110,17 @@ class FlightWindow:
     priority: float      # 0-1, higher = fly this first
     thermal_ok: bool     # planner expects turtles to stand out on thermal in this window
     reasons: list[str]   # plain English, shown to Logan / the site manager
+
+
+@dataclass
+class RelocationSuggestion:
+    """F1: where a responder should carry one turtle, and why. Rules from Tanya Finch (Oct 27, 2026)."""
+    alert_id: str
+    target_lat: float
+    target_lon: float
+    distance_m: float
+    bearing_deg: float   # clockwise from north, from the turtle to the target
+    reasons: list[str]   # plain English, first line is the instruction
 
 
 _ENUMS = {"sensor": Sensor, "confidence": Confidence, "status": Status}

@@ -134,7 +134,8 @@ def heatmap_geojson(cells: np.ndarray, cell_transform, crs, site_id: str, year: 
                [f"{dist[r, c]:.0f} m from vegetation: turtles leaving cover cross here"] if np.isfinite(dist[r, c]) and dist[r, c] > 0 else
                [f"Edge of vegetation (NDVI {cells[r, c]:.2f})"])
         feats.append({"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[float(x), float(y)] for x, y in ring]]},
-                      "properties": {"likelihood": round(float(lik[r, c]), 3), "reasons": why, "on_site": bool(cleared[r, c])}})
+                      "properties": {"likelihood": round(float(lik[r, c]), 3), "reasons": why, "on_site": bool(cleared[r, c]),
+                                     "ndvi": round(float(cells[r, c]), 3)}})
     return {"type": "FeatureCollection", "name": f"{site_id} turtle likelihood (NAIP {year} NDVI, {CELL_M} m grid)", "features": feats}
 
 
