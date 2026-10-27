@@ -61,3 +61,25 @@ def test_geojson_matches_mock_shape(tmp_path):
     save(ndvi, TR, CRS, fc, tmp_path)
     assert json.loads((tmp_path / "heatmap.geojson").read_text())["features"]
     assert (tmp_path / "ndvi.tif").exists() and (tmp_path / "ndvi_preview.png").exists()
+
+
+def test_site_outline_clears_old_vegetation(tmp_path):
+    """Draw a site over the old woods: inside it is bare now, and the woods' edge moves to the outline."""
+    from rasterio.warp import transform as reproject
+    cells, ct = to_cells(fake_ndvi(), TR)
+    x0, y0 = ct * (0, 0)
+    x1, y1 = ct * (4, cells.shape[0])  # first 4 columns = old woods inside the site
+    lon, lat = reproject(CRS, "EPSG:4326", [x0, x1, x1, x0, x0], [y0, y0, y1, y1, y0])
+    site = tmp_path / "site.geojson"
+    site.write_text(json.dumps({"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {},
+                    "geometry": {"type": "Polygon", "coordinates": [[[a, b] for a, b in zip(lon, lat)]]}}]}))
+    from turtles.planner.habitat import site_mask
+    m = site_mask(site, cells.shape, ct, CRS)
+    assert m[:, :4].all() and not m[:, 4:].any()
+    before, _, _ = likelihood(cells, 10)
+    after, _, _ = likelihood(cells, 10, m)
+    assert after[8, 0] < before[8, 0]          # cleared woods no longer count as habitat
+    assert after[8, 3] > after[8, 0]           # on site, cells next to the remaining woods rank higher
+    fc = heatmap_geojson(cells, ct, CRS, "t", "2023", m)
+    on = [f for f in fc["features"] if f["properties"]["on_site"]]
+    assert on and all("Cleared site" in f["properties"]["reasons"][0] for f in on)
