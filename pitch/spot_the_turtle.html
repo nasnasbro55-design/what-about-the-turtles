@@ -1,0 +1,57 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Spot the Turtle</title>
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:-apple-system,Helvetica,Arial,sans-serif;color:#fff}
+canvas{display:block}
+#drop{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#14210f;font-size:20px;text-align:center}
+#drop small{opacity:.7;font-size:15px;max-width:620px;line-height:1.5}
+#hud{position:fixed;left:12px;bottom:10px;font-size:13px;opacity:.55;pointer-events:none}
+</style></head><body>
+<div id="drop"><b>Spot the Turtle — pitch opener</b>
+<input type="file" id="file" accept="image/*">
+<small>Pick a Grayson 50 ft photo (stays on this laptop).<br>
+Setup: press <b>S</b>, click the shell, press <b>S</b> again. The spot is remembered for that file.<br>
+Present: <b>F</b> fullscreen · <b>Space</b>/<b>→</b> next · <b>←</b> back · <b>E</b> save the current screen as a 1920×1080 JPG for slides.</small></div>
+<canvas id="c"></canvas><div id="hud"></div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d'),hud=document.getElementById('hud');
+let img=null,name='',mark=null,stage=0,setup=false,t0=0,from=null;
+const CAP='Eastern box turtle shell, half buried · photographed from 50 ft · Grayson Overlook, Oct 24';
+const load=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
+const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+document.getElementById('file').onchange=e=>{const f=e.target.files[0];if(!f)return;name=f.name;
+  const i=new Image();i.onload=()=>{img=i;mark=load('stt:'+name);document.getElementById('drop').remove();stage=0;draw()};i.src=URL.createObjectURL(f)};
+function view(W,H,s){ // returns [scale, cx, cy] in image px
+  const full=[Math.min(W/img.width,H/img.height),img.width/2,img.height/2];
+  if(s<2||!mark)return full; return [H/420,mark[0],mark[1]]}
+function ease(u){return u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2}
+function render(g,W,H,s,u){
+  g.fillStyle='#000';g.fillRect(0,0,W,H);if(!img)return;
+  let a=view(W,H,s),b=from||a;u=ease(Math.min(1,u));
+  const sc=Math.exp(Math.log(b[0])+(Math.log(a[0])-Math.log(b[0]))*u),cx=b[1]+(a[1]-b[1])*u,cy=b[2]+(a[2]-b[2])*u;
+  g.save();g.translate(W/2,H/2);g.scale(sc,sc);g.translate(-cx,-cy);g.drawImage(img,0,0);
+  if(mark&&(s>=1||setup)){g.lineWidth=Math.max(3/sc,4);g.strokeStyle=setup?'#0ff':'#ffd400';
+    const r=Math.max(60,26/sc*2);g.beginPath();g.arc(mark[0],mark[1],s>=2?70:r,0,7);g.stroke()}
+  g.restore();
+  g.textBaseline='top';g.shadowColor='rgba(0,0,0,.8)';g.shadowBlur=H*.012;g.fillStyle='#fff';
+  if(s===0&&!setup){g.font=`700 ${H*.075}px -apple-system,Helvetica,Arial`;g.fillText('Can you spot the turtle?',W*.04,H*.05)}
+  if(s===1){g.font=`700 ${H*.06}px -apple-system,Helvetica,Arial`;g.fillText('Right here.',W*.04,H*.05)}
+  if(s===2){g.font=`500 ${H*.032}px -apple-system,Helvetica,Arial`;g.fillText(CAP,W*.04,H*.9)}
+  g.shadowBlur=0}
+function draw(){c.width=innerWidth*devicePixelRatio;c.height=innerHeight*devicePixelRatio;c.style.width=innerWidth+'px';c.style.height=innerHeight+'px';
+  const u=(performance.now()-t0)/1400;render(x,c.width,c.height,stage,from?u:1);
+  hud.textContent=setup?'SETUP: click the shell, then press S':(mark?'':'No shell marked yet: press S');
+  if(from&&u<1)requestAnimationFrame(draw);else from=null}
+function go(s){s=Math.max(0,Math.min(2,s));if(s===stage)return;if(!mark&&s>0){hud.textContent='Mark the shell first (press S)';return}
+  from=view(c.width,c.height,stage);stage=s;t0=performance.now();draw()}
+c.onclick=e=>{if(!setup||!img)return;const W=c.width,H=c.height,[sc,cx,cy]=view(W,H,stage);
+  mark=[(e.clientX*devicePixelRatio-W/2)/sc+cx,(e.clientY*devicePixelRatio-H/2)/sc+cy];save('stt:'+name,mark);draw()};
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();
+  if(k==='s'){setup=!setup;stage=0;draw()}
+  else if(k===' '||k==='arrowright'){e.preventDefault();go(stage+1)}
+  else if(k==='arrowleft')go(stage-1);
+  else if(k==='f')document.documentElement.requestFullscreen?.();
+  else if(k==='e'&&img){const o=document.createElement('canvas');o.width=1920;o.height=1080;const sv=setup;setup=false;render(o.getContext('2d'),1920,1080,stage,1);setup=sv;
+    o.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`spot_the_turtle_${stage+1}.jpg`;a.click()},'image/jpeg',.92)}});
+addEventListener('resize',draw);
+</script></body></html>
