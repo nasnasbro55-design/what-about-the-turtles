@@ -11,19 +11,19 @@ canvas{display:block}
 <input type="file" id="file" accept="image/*">
 <small>Pick a Grayson 50 ft photo (stays on this laptop).<br>
 Setup: press <b>S</b>, click the shell, press <b>S</b> again. The spot is remembered for that file.<br>
-Present: <b>F</b> fullscreen · <b>Space</b>/<b>→</b> next · <b>←</b> back · <b>E</b> save the current screen as a 1920×1080 JPG for slides.</small></div>
+Zoom depth: <b>+</b>/<b>−</b> (closer = blurrier) · <b>C</b> fit/fill.<br>Present: <b>F</b> fullscreen · <b>Space</b>/<b>→</b> next · <b>←</b> back · <b>E</b> saves all 3 screens as 1920×1080 JPGs for slides.</small></div>
 <canvas id="c"></canvas><div id="hud"></div>
 <script>
 const c=document.getElementById('c'),x=c.getContext('2d'),hud=document.getElementById('hud');
-let img=null,name='',mark=null,stage=0,setup=false,t0=0,from=null;
+let img=null,name='',mark=null,Z=420,fill=true,stage=0,setup=false,t0=0,from=null;
 const CAP='Eastern box turtle shell, half buried · photographed from 50 ft · Grayson Overlook, Oct 24';
 const load=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
 const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 document.getElementById('file').onchange=e=>{const f=e.target.files[0];if(!f)return;name=f.name;
-  const i=new Image();i.onload=()=>{img=i;mark=load('stt:'+name);document.getElementById('drop').remove();stage=0;draw()};i.src=URL.createObjectURL(f)};
+  const i=new Image();i.onload=()=>{img=i;mark=load('stt:'+name);const z=load('sttz:'+name);if(z)Z=z;document.getElementById('drop').remove();stage=0;draw()};i.src=URL.createObjectURL(f)};
 function view(W,H,s){ // returns [scale, cx, cy] in image px
-  const full=[Math.min(W/img.width,H/img.height),img.width/2,img.height/2];
-  if(s<2||!mark)return full; return [H/420,mark[0],mark[1]]}
+  const full=[(fill?Math.max:Math.min)(W/img.width,H/img.height),img.width/2,img.height/2];
+  if(s<2||!mark)return full; return [H/Z,mark[0],mark[1]]}
 function ease(u){return u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2}
 function render(g,W,H,s,u){
   g.fillStyle='#000';g.fillRect(0,0,W,H);if(!img)return;
@@ -40,7 +40,7 @@ function render(g,W,H,s,u){
   g.shadowBlur=0}
 function draw(){c.width=innerWidth*devicePixelRatio;c.height=innerHeight*devicePixelRatio;c.style.width=innerWidth+'px';c.style.height=innerHeight+'px';
   const u=(performance.now()-t0)/1400;render(x,c.width,c.height,stage,from?u:1);
-  hud.textContent=setup?'SETUP: click the shell, then press S':(mark?'':'No shell marked yet: press S');
+  hud.textContent=setup?'SETUP: click the shell, then press S · +/- zoom depth ('+Math.round(Z)+' px) · C fit/fill':(mark?'':'No shell marked yet: press S');
   if(from&&u<1)requestAnimationFrame(draw);else from=null}
 function go(s){s=Math.max(0,Math.min(2,s));if(s===stage)return;if(!mark&&s>0){hud.textContent='Mark the shell first (press S)';return}
   from=view(c.width,c.height,stage);stage=s;t0=performance.now();draw()}
@@ -50,8 +50,13 @@ addEventListener('keydown',e=>{const k=e.key.toLowerCase();
   if(k==='s'){setup=!setup;stage=0;draw()}
   else if(k===' '||k==='arrowright'){e.preventDefault();go(stage+1)}
   else if(k==='arrowleft')go(stage-1);
+  else if(k==='='||k==='+'||k==='-'){Z=Math.max(100,Math.min(1500,Z*(k==='-'?1.25:0.8)));save('sttz:'+name,Z);draw()}
+  else if(k==='c'){fill=!fill;draw()}
   else if(k==='f')document.documentElement.requestFullscreen?.();
-  else if(k==='e'&&img){const o=document.createElement('canvas');o.width=1920;o.height=1080;const sv=setup;setup=false;render(o.getContext('2d'),1920,1080,stage,1);setup=sv;
-    o.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`spot_the_turtle_${stage+1}.jpg`;a.click()},'image/jpeg',.92)}});
+  else if(k==='e'&&img){if(!mark){hud.textContent='Mark the shell first (press S)';return}
+    const sv=setup;setup=false;
+    [0,1,2].forEach(st=>{const o=document.createElement('canvas');o.width=1920;o.height=1080;render(o.getContext('2d'),1920,1080,st,1);
+      o.toBlob(bl=>setTimeout(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download=`spot_the_turtle_${st+1}.jpg`;a.click()},st*700),'image/jpeg',.92)});
+    setup=sv;hud.textContent='Saved 3 JPGs to Downloads';setTimeout(()=>{window.focus();draw()},2500)}});
 addEventListener('resize',draw);
 </script></body></html>
