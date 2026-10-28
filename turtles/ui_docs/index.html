@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>What About the Turtles | Responder Map & Alert Dashboard</title>
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --primary: #15803d;
+      --primary-dark: #166534;
+      --bg-dark: #0f172a;
+      --bg-card: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      
+      --color-high: #dc2626;
+      --color-review: #d97706;
+      --color-closed: #64748b;
+      --color-relocated: #16a34a;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html { width: 100%; height: 100%; font-family: var(--font-sans); color: var(--text-main); background: #f8fafc; overflow: hidden; }
+
+    .app-root { display: flex; flex-direction: column; width: 100vw; height: 100vh; }
+    
+    header {
+      background: var(--bg-dark);
+      color: #fff;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .brand { display: flex; align-items: center; gap: 0.6rem; }
+    .brand-icon { font-size: 1.5rem; }
+    .brand h1 { font-size: 1.125rem; font-weight: 800; letter-spacing: -0.01em; }
+    .brand span { font-size: 0.75rem; color: #94a3b8; display: block; font-weight: 500; }
+    
+    .header-actions { display: flex; align-items: center; gap: 0.75rem; }
+    .badge-open-count {
+      background: #ef4444;
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .main-workspace {
+      display: flex;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Map View */
+    #map {
+      flex: 1;
+      height: 100%;
+      width: 100%;
+      background: #cbd5e1;
+    }
+
+    .map-floating-panel {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      z-index: 900;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .btn-map-tool {
+      background: #fff;
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+      transition: all 0.15s ease;
+    }
+    .btn-map-tool:hover { background: #f8fafc; }
+    .btn-map-tool.active { background: #15803d; color: #fff; border-color: #15803d; }
+
+    /* Side / Drawer Panel */
+    .sidebar {
+      width: 380px;
+      background: #ffffff;
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 950;
+      transition: transform 0.25s ease;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.06);
+    }
+
+    .sidebar-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: #f8fafc;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 0.75rem;
+      text-align: center;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      background: #ffffff;
+    }
+
+    .tab-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    /* Alerts List */
+    .filter-bar {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 0.5rem;
+    }
+    .filter-chip {
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: #f1f5f9;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .filter-chip.active {
+      background: var(--bg-dark);
+      color: #fff;
+      border-color: var(--bg-dark);
+    }
+
+    .alert-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      background: #ffffff;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      gap: 0.75rem;
+      border-left: 4px solid #cbd5e1;
+    }
+    .alert-card:hover { border-color: #94a3b8; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .alert-card.selected { border-color: #2563eb; background: #eff6ff; }
+    .alert-card.alert-high { border-left-color: var(--color-high); }
+    .alert-card.alert-review { border-left-color: var(--color-review); }
+    .alert-card.alert-closed { border-left-color: var(--color-closed); opacity: 0.85; }
+
+    .alert-thumb-box {
+      width: 56px;
+      height: 56px;
+      border-radius: 6px;
+      background: #e2e8f0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .alert-info { flex: 1; }
+    .alert-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
+    .alert-id { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; color: #334155; }
+    
+    .badge-conf {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .badge-high { background: #fee2e2; color: #b91c1c; }
+    .badge-review { background: #fef3c7; color: #b45309; }
+    .badge-closed { background: #f1f5f9; color: #475569; }
+
+    .sensors-row { display: flex; gap: 0.3rem; margin-top: 0.25rem; }
+    .sensor-tag {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      background: #f1f5f9;
+      color: #475569;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+    }
+    .sensor-thermal { background: #fed7aa; color: #9a3412; }
+
+    .alert-note-snippet { font-size: 0.75rem; color: #475569; margin-top: 0.25rem; font-style: italic; }
+
+    /* Next Flights Panel */
+    .flight-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem;
+      background: #ffffff;
+      border-top: 4px solid var(--primary);
+    }
+    .flight-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
+    .flight-zone { font-weight: 700; font-size: 0.9375rem; color: #1e293b; }
+    .flight-time { font-size: 0.8125rem; color: #475569; font-weight: 600; }
+    .thermal-badge-ok { background: #ffedd5; color: #c2410c; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px; }
+    .thermal-badge-no { background: #f1f5f9; color: #64748b; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px; }
+    .flight-reasons { list-style: disc; margin-left: 1.25rem; margin-top: 0.5rem; font-size: 0.8125rem; color: #334155; }
+    .flight-reasons li { margin-bottom: 0.25rem; }
+
+    /* Detail Modal / Sheet */
+    .detail-overlay {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 400px;
+      background: #fff;
+      border-left: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      border-top-left-radius: 12px;
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
+      z-index: 990;
+      max-height: 90%;
+      overflow-y: auto;
+      display: none;
+      flex-direction: column;
+    }
+    .detail-overlay.open { display: flex; }
+    .detail-header { padding: 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .detail-body { padding: 1rem; display: flex; flex-direction: column; gap: 0.85rem; }
+    
+    .detail-thumb-large {
+      width: 100%;
+      height: 160px;
+      border-radius: 8px;
+      background: #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-size: 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Relocation Guide Card (F1) */
+    .relocation-guide-card {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .relocation-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .relocation-tag {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #166534;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .relocation-instruction {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: #15803d;
+      background: #dcfce7;
+      padding: 0.4rem 0.65rem;
+      border-radius: 6px;
+      border-left: 4px solid #16a34a;
+    }
+    .relocation-meta {
+      font-size: 0.75rem;
+      color: #166534;
+      font-weight: 600;
+    }
+    .relocation-reasons-list {
+      list-style: disc;
+      margin-left: 1.25rem;
+      font-size: 0.75rem;
+      color: #374151;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    
+    .btn-nav-gmaps {
+      background: #2563eb;
+      color: #fff;
+      text-decoration: none;
+      padding: 0.65rem 1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .triage-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .btn-triage {
+      padding: 0.6rem 0.3rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      transition: opacity 0.15s ease;
+    }
+    .btn-triage:hover { opacity: 0.85; }
+    .btn-relocated { background: #16a34a; color: #fff; }
+    .btn-confirmed { background: #2563eb; color: #fff; }
+    .btn-fp { background: #64748b; color: #fff; }
+
+    @media (max-width: 768px) {
+      .main-workspace { flex-direction: column; }
+      .sidebar { width: 100%; height: 50%; border-left: none; border-top: 1px solid var(--border); }
+      .detail-overlay { width: 100%; left: 0; border-radius: 16px 16px 0 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-root">
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🐢</div>
+      <div>
+        <h1>What About the Turtles</h1>
+        <span>Field Responder App · W.A. Hazel & Aero Animal Rescue</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="badge-open-count" id="openCountBadge">
+        <span>⚠</span> <span id="openCountNumber">2</span> Open Alerts
+      </div>
+    </div>
+  </header>
+
+  <div class="main-workspace">
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <!-- Floating Map Controls -->
+    <div class="map-floating-panel">
+      <button class="btn-map-tool" id="btnToggleZones" onclick="toggleZones()">
+        <span>🏗</span> Work Zones
+      </button>
+      <button class="btn-map-tool" id="btnToggleHeatmap" onclick="toggleHeatmap()">
+        <span>🔥</span> Turtle Likelihood Heatmap
+      </button>
+      <button class="btn-map-tool" onclick="resetMapView()">
+        <span>🎯</span> Center Site (Grayson)
+      </button>
+    </div>
+
+    <!-- Sidebar with Tabs -->
+    <aside class="sidebar">
+      <div class="sidebar-tabs">
+        <button class="tab-btn active" id="tabAlertsBtn" onclick="switchTab('alerts')">Active Alerts</button>
+        <button class="tab-btn" id="tabPlannerBtn" onclick="switchTab('planner')">Flight Windows</button>
+      </div>
+
+      <!-- Tab: Alerts -->
+      <div class="tab-content" id="tabAlerts">
+        <div class="filter-bar">
+          <button class="filter-chip active" onclick="setFilter('all', this)">All</button>
+          <button class="filter-chip" onclick="setFilter('open', this)">Open Only</button>
+          <button class="filter-chip" onclick="setFilter('closed', this)">Resolved</button>
+        </div>
+        <div id="alertsListContainer"></div>
+      </div>
+
+      <!-- Tab: Next Flights / Planner -->
+      <div class="tab-content" id="tabPlanner" style="display: none;">
+        <div style="font-size: 0.8125rem; color: #475569; margin-bottom: 0.5rem;">
+          <strong>Survey Strategy:</strong> Detect turtles before heavy equipment clearing begins.
+        </div>
+        <div id="flightWindowsContainer"></div>
+      </div>
+    </aside>
+
+    <!-- Slide-up Alert Detail Sheet with Relocation Guide -->
+    <div class="detail-overlay" id="detailSheet">
+      <div class="detail-header">
+        <strong id="detailAlertId">Alert Detail</strong>
+        <button onclick="closeDetail()" style="background:none; border:none; font-size:1.25rem; cursor:pointer;">✕</button>
+      </div>
+      <div class="detail-body">
+        <div class="detail-thumb-large" id="detailThumb">
+          🐢
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span id="detailConfidenceBadge" class="badge-conf badge-high">HIGH CONFIDENCE</span>
+          <span id="detailScore" style="font-size:0.875rem; font-weight:700;">Score: 88%</span>
+        </div>
+        
+        <div style="font-size:0.8125rem; color:#475569;">
+          <strong>Sensors:</strong> <span id="detailSensors">RGB + Thermal</span><br>
+          <strong>Detected At:</strong> <span id="detailTime">2026-10-25 14:22 UTC</span><br>
+          <strong>Coordinates:</strong> <span id="detailCoords" class="font-mono">38.7601, -77.5199</span><br>
+          <strong>Note:</strong> <span id="detailNote">Eastern box turtle near haul road</span>
+        </div>
+
+        <!-- Relocation Guide (F1 Feature from Tanya Finch) -->
+        <div class="relocation-guide-card" id="relocationBox">
+          <div class="relocation-header">
+            <span class="relocation-tag">🧭 Relocation Guide (Tanya's Rules)</span>
+            <span class="relocation-meta" id="relocationMeta">47m · Bearing 0°</span>
+          </div>
+          <div class="relocation-instruction" id="relocationPrimary">
+            👉 Carry 47 m north to dense cover over the silt fence into the woodline
+          </div>
+          <ul class="relocation-reasons-list" id="relocationReasons">
+            <li>Tanya: Pick up like a hamburger with two hands.</li>
+            <li>Dense canopy cover with leaf litter (NDVI 0.62) safely away from haul road.</li>
+          </ul>
+        </div>
+
+        <a id="btnNavMaps" class="btn-nav-gmaps" href="#" target="_blank" rel="noopener">
+          <span>🧭</span> Navigate to Turtle on Google Maps
+        </a>
+
+        <div style="margin-top:0.5rem;">
+          <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#64748b;">Field Responder Action:</label>
+          <div class="triage-actions">
+            <button class="btn-triage btn-relocated" onclick="updateAlertStatus('relocated')">
+              <span>🌿</span> Relocated
+            </button>
+            <button class="btn-triage btn-confirmed" onclick="updateAlertStatus('confirmed')">
+              <span>✓</span> Confirmed
+            </button>
+            <button class="btn-triage btn-fp" onclick="updateAlertStatus('false_positive')">
+              <span>✕</span> False Alarm
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = window.API_BASE || 'http://localhost:8000';
+
+  let alerts = [];
+  let zones = [];
+  let windows = [];
+  let currentFilter = 'all';
+  let activeAlert = null;
+  let showZones = true;
+  let showHeatmap = false;
+
+  let map;
+  let alertMarkersLayer;
+  let zonesLayer;
+  let heatmapLayer;
+  let relocationLayer;
+
+  const MOCK_ALERTS = [
+    {
+      "alert_id": "F-20261025-01-A001",
+      "site_id": "grayson-mock",
+      "flight_id": "F-20261025-01",
+      "lat": 38.7601787,
+      "lon": -77.5199661,
+      "confidence": "high",
+      "score": 0.88,
+      "sensors": ["rgb", "thermal"],
+      "detection_ids": ["F-20261025-01-d004", "F-20261025-01-d003"],
+      "thumbnail": "thumbnails/F-20261025-01-d004.jpg",
+      "created_at": "2026-10-25T14:22:05Z",
+      "status": "relocated",
+      "note": "Eastern box turtle, moved to woodline north of lot"
+    },
+    {
+      "alert_id": "F-20261025-01-A002",
+      "site_id": "grayson-mock",
+      "flight_id": "F-20261025-01",
+      "lat": 38.7600584,
+      "lon": -77.5200343,
+      "confidence": "high",
+      "score": 0.78,
+      "sensors": ["rgb"],
+      "detection_ids": ["F-20261025-01-d001"],
+      "thumbnail": "thumbnails/F-20261025-01-d001.jpg",
+      "created_at": "2026-10-25T14:22:05Z",
+      "status": "open",
+      "note": "Spotted near haul road silt fence"
+    },
+    {
+      "alert_id": "F-20261025-01-A003",
+      "site_id": "grayson-mock",
+      "flight_id": "F-20261025-01",
+      "lat": 38.7604701,
+      "lon": -77.519923,
+      "confidence": "review",
+      "score": 0.55,
+      "sensors": ["rgb"],
+      "detection_ids": ["F-20261025-01-d006"],
+      "thumbnail": "thumbnails/F-20261025-01-d006.jpg",
+      "created_at": "2026-10-25T14:22:05Z",
+      "status": "open",
+      "note": "Camouflaged in leaf litter"
+    },
+    {
+      "alert_id": "F-20261025-01-A004",
+      "site_id": "grayson-mock",
+      "flight_id": "F-20261025-01",
+      "lat": 38.7603361,
+      "lon": -77.5200807,
+      "confidence": "review",
+      "score": 0.41,
+      "sensors": ["rgb"],
+      "detection_ids": ["F-20261025-01-d005"],
+      "thumbnail": "thumbnails/F-20261025-01-d005.jpg",
+      "created_at": "2026-10-25T14:22:05Z",
+      "status": "false_positive",
+      "note": "Rock, about 15 cm"
+    }
+  ];
+
+  const MOCK_ZONES = [
+    {
+      "zone_id": "Z1",
+      "name": "North lot",
+      "polygon": [[38.7598, -77.5208], [38.7598, -77.5192], [38.7606, -77.5192], [38.7606, -77.5208]],
+      "work": "clearing",
+      "work_starts": "2026-10-27T11:00:00Z"
+    },
+    {
+      "zone_id": "Z2",
+      "name": "East woodline buffer",
+      "polygon": [[38.7598, -77.5192], [38.7598, -77.5185], [38.7606, -77.5185], [38.7606, -77.5192]],
+      "work": "grading",
+      "work_starts": "2026-10-29T11:00:00Z"
+    },
+    {
+      "zone_id": "Z3",
+      "name": "South laydown yard",
+      "polygon": [[38.759, -77.5208], [38.759, -77.5185], [38.7598, -77.5185], [38.7598, -77.5208]],
+      "work": "staging",
+      "work_starts": "2026-11-05T12:00:00Z"
+    }
+  ];
+
+  const MOCK_WINDOWS = [
+    {
+      "window_id": "W-20261025-1",
+      "zone_id": "Z1",
+      "zone_name": "North lot",
+      "start": "2026-10-25T20:30:00Z",
+      "end": "2026-10-25T22:00:00Z",
+      "priority": 0.92,
+      "thermal_ok": true,
+      "reasons": [
+        "Clearing starts Tue Oct 27, 7:00 AM (in 2 days)",
+        "Sunny afternoon, then the ground cools before sunset: good thermal window",
+        "Dry, light wind"
+      ]
+    },
+    {
+      "window_id": "W-20261026-1",
+      "zone_id": "Z1",
+      "zone_name": "North lot",
+      "start": "2026-10-26T14:00:00Z",
+      "end": "2026-10-26T16:00:00Z",
+      "priority": 0.71,
+      "thermal_ok": false,
+      "reasons": [
+        "Clearing starts tomorrow, 7:00 AM: last chance before equipment arrives",
+        "Overcast: turtles likely match ground temperature, so RGB only",
+        "Dry, wind 4 m/s"
+      ]
+    }
+  ];
+
+  // Mock relocation suggestions matching Tanya Finch's rules
+  const MOCK_RELOCATIONS = {
+    "F-20261025-01-A001": {
+      "alert_id": "F-20261025-01-A001",
+      "target_lat": 38.7607,
+      "target_lon": -77.5199,
+      "distance_m": 58,
+      "bearing_deg": 6,
+      "reasons": [
+        "Carry 58 m north to dense cover over the silt fence into the woodline",
+        "Tanya: Pick up like a hamburger with two hands; keep upright and low to the ground.",
+        "Target habitat has dense tree canopy and leaf litter (NDVI 0.62) safely away from haul road.",
+        "Avoids equipment clearing in North lot (Zone Z1)."
+      ]
+    },
+    "F-20261025-01-A002": {
+      "alert_id": "F-20261025-01-A002",
+      "target_lat": 38.7601,
+      "target_lon": -77.5212,
+      "distance_m": 62,
+      "bearing_deg": 275,
+      "reasons": [
+        "Carry 62 m west across the boundary line into protected forest buffer",
+        "Tanya: Follow turtle's heading west away from active haul road.",
+        "Ground cover: undisturbed leaf litter with shaded understory.",
+        "Release under brush, not in open exposed dirt."
+      ]
+    },
+    "F-20261025-01-A003": {
+      "alert_id": "F-20261025-01-A003",
+      "target_lat": 38.7608,
+      "target_lon": -77.5196,
+      "distance_m": 45,
+      "bearing_deg": 35,
+      "reasons": [
+        "Carry 45 m northeast to dense woods beyond construction limit",
+        "Tanya: Move past orange boundary fencing.",
+        "High vegetative moisture index; suitable wintering soil."
+      ]
+    }
+  };
+
+  function initMap() {
+    map = L.map('map', { zoomControl: true }).setView([38.7601, -77.5198], 18);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 21,
+      attribution: '© OpenStreetMap | W.A. Hazel Grayson Overlook'
+    }).addTo(map);
+
+    alertMarkersLayer = L.layerGroup().addTo(map);
+    zonesLayer = L.layerGroup().addTo(map);
+    heatmapLayer = L.layerGroup();
+    relocationLayer = L.layerGroup().addTo(map);
+  }
+
+  function renderZones() {
+    zonesLayer.clearLayers();
+    if (!showZones) return;
+
+    zones.forEach(z => {
+      const polygon = L.polygon(z.polygon, {
+        color: '#d97706',
+        fillColor: '#fef3c7',
+        fillOpacity: 0.25,
+        weight: 2,
+        dashArray: '5, 5'
+      }).addTo(zonesLayer);
+
+      const label = `${z.name} (${z.work.toUpperCase()})<br><small>Starts: ${new Date(z.work_starts).toLocaleDateString()}</small>`;
+      polygon.bindTooltip(label, { permanent: true, direction: 'center', className: 'zone-label' });
+    });
+  }
+
+  function getMarkerColor(alert) {
+    if (alert.status !== 'open') return '#64748b';
+    if (alert.confidence === 'high') return '#dc2626';
+    return '#d97706';
+  }
+
+  function renderAlertMarkers() {
+    alertMarkersLayer.clearLayers();
+
+    alerts.forEach(alert => {
+      const color = getMarkerColor(alert);
+      const marker = L.circleMarker([alert.lat, alert.lon], {
+        radius: 10,
+        fillColor: color,
+        color: '#ffffff',
+        weight: 2.5,
+        opacity: 1,
+        fillOpacity: 0.95
+      }).addTo(alertMarkersLayer);
+
+      marker.on('click', () => openDetail(alert));
+
+      marker.bindTooltip(`<strong>${alert.alert_id}</strong><br>${alert.confidence.toUpperCase()} - ${alert.status}`, {
+        direction: 'top',
+        offset: [0, -8]
+      });
+    });
+  }
+
+  function renderAlertsList() {
+    const container = document.getElementById('alertsListContainer');
+    container.innerHTML = '';
+
+    const filtered = alerts.filter(a => {
+      if (currentFilter === 'open') return a.status === 'open';
+      if (currentFilter === 'closed') return a.status !== 'open';
+      return true;
+    });
+
+    const openCount = alerts.filter(a => a.status === 'open').length;
+    document.getElementById('openCountNumber').innerText = openCount;
+
+    filtered.forEach(alert => {
+      const card = document.createElement('div');
+      card.className = `alert-card alert-${alert.status !== 'open' ? 'closed' : alert.confidence}`;
+      if (activeAlert && activeAlert.alert_id === alert.alert_id) card.classList.add('selected');
+
+      const confBadgeClass = alert.status !== 'open' ? 'badge-closed' : (alert.confidence === 'high' ? 'badge-high' : 'badge-review');
+      const confText = alert.status !== 'open' ? alert.status.toUpperCase() : alert.confidence.toUpperCase();
+
+      card.innerHTML = `
+        <div class="alert-thumb-box">🐢</div>
+        <div class="alert-info">
+          <div class="alert-meta">
+            <span class="alert-id">${alert.alert_id}</span>
+            <span class="badge-conf ${confBadgeClass}">${confText}</span>
+          </div>
+          <div style="font-size:0.8125rem; font-weight:600;">Score: ${(alert.score * 100).toFixed(0)}%</div>
+          <div class="sensors-row">
+            ${alert.sensors.map(s => `<span class="sensor-tag ${s === 'thermal' ? 'sensor-thermal' : ''}">${s.toUpperCase()}</span>`).join('')}
+          </div>
+          ${alert.note ? `<div class="alert-note-snippet">${alert.note}</div>` : ''}
+        </div>
+      `;
+
+      card.onclick = () => {
+        map.setView([alert.lat, alert.lon], 20);
+        openDetail(alert);
+      };
+
+      container.appendChild(card);
+    });
+  }
+
+  function renderFlightWindows() {
+    const container = document.getElementById('flightWindowsContainer');
+    container.innerHTML = '';
+
+    windows.forEach(w => {
+      const card = document.createElement('div');
+      card.className = 'flight-card';
+      const startDate = new Date(w.start);
+      const timeStr = `${startDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+      card.innerHTML = `
+        <div class="flight-header">
+          <div>
+            <div class="flight-zone">Zone ${w.zone_id} (${w.zone_name || 'Work Area'})</div>
+            <div class="flight-time">🕒 ${timeStr}</div>
+          </div>
+          <div>${w.thermal_ok ? '<span class="thermal-badge-ok">THERMAL OK</span>' : '<span class="thermal-badge-no">RGB ONLY</span>'}</div>
+        </div>
+        <div style="font-size:0.75rem; font-weight:700; color:#15803d;">Priority Rank: ${(w.priority * 100).toFixed(0)}%</div>
+        <ul class="flight-reasons">${w.reasons.map(r => `<li>${r}</li>`).join('')}</ul>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  async function openDetail(alert) {
+    activeAlert = alert;
+    document.getElementById('detailAlertId').innerText = alert.alert_id;
+    document.getElementById('detailScore').innerText = `Score: ${(alert.score * 100).toFixed(0)}%`;
+    document.getElementById('detailSensors').innerText = alert.sensors.map(s => s.toUpperCase()).join(' + ');
+    document.getElementById('detailTime').innerText = alert.created_at;
+    document.getElementById('detailCoords').innerText = `${alert.lat.toFixed(6)}, ${alert.lon.toFixed(6)}`;
+    document.getElementById('detailNote').innerText = alert.note || '(No responder note)';
+
+    const badge = document.getElementById('detailConfidenceBadge');
+    badge.className = `badge-conf ${alert.status !== 'open' ? 'badge-closed' : (alert.confidence === 'high' ? 'badge-high' : 'badge-review')}`;
+    badge.innerText = alert.status !== 'open' ? alert.status.toUpperCase() : `${alert.confidence.toUpperCase()} CONFIDENCE`;
+
+    document.getElementById('btnNavMaps').href = `https://www.google.com/maps/dir/?api=1&destination=${alert.lat},${alert.lon}`;
+
+    // Fetch or mock Relocation Suggestion (F1 feature from Naz / Tanya)
+    let relocation = MOCK_RELOCATIONS[alert.alert_id];
+    try {
+      const res = await fetch(`${API_BASE}/alerts/${alert.alert_id}/relocation`);
+      if (res.ok) relocation = await res.json();
+    } catch (e) {}
+
+    renderRelocationGuide(alert, relocation);
+
+    document.getElementById('detailSheet').classList.add('open');
+    renderAlertsList();
+  }
+
+  // Draw relocation arrow on Leaflet map & populate UI
+  function renderRelocationGuide(alert, rel) {
+    relocationLayer.clearLayers();
+    const box = document.getElementById('relocationBox');
+
+    if (!rel) {
+      box.style.display = 'none';
+      return;
+    }
+
+    box.style.display = 'flex';
+    document.getElementById('relocationMeta').innerText = `${rel.distance_m}m · Bearing ${Math.round(rel.bearing_deg)}°`;
+    document.getElementById('relocationPrimary').innerText = `👉 ${rel.reasons[0]}`;
+    
+    const reasonsList = document.getElementById('relocationReasons');
+    reasonsList.innerHTML = rel.reasons.slice(1).map(r => `<li>${r}</li>`).join('');
+
+    // Draw Arrow on Leaflet Map
+    const start = [alert.lat, alert.lon];
+    const end = [rel.target_lat, rel.target_lon];
+
+    // Direction line
+    L.polyline([start, end], {
+      color: '#16a34a',
+      weight: 4,
+      dashArray: '6, 8',
+      opacity: 0.95
+    }).addTo(relocationLayer);
+
+    // Target Release Point marker
+    L.circleMarker(end, {
+      radius: 8,
+      fillColor: '#16a34a',
+      color: '#ffffff',
+      weight: 2,
+      fillOpacity: 1
+    }).bindTooltip(`<strong>Target Release:</strong><br>${rel.reasons[0]}`, { permanent: true, direction: 'top' })
+      .addTo(relocationLayer);
+  }
+
+  function closeDetail() {
+    activeAlert = null;
+    relocationLayer.clearLayers();
+    document.getElementById('detailSheet').classList.remove('open');
+    renderAlertsList();
+  }
+
+  async function updateAlertStatus(newStatus) {
+    if (!activeAlert) return;
+    const alertId = activeAlert.alert_id;
+    const note = prompt(`Enter responder field note for ${alertId}:`, activeAlert.note || '');
+
+    try {
+      await fetch(`${API_BASE}/alerts/${alertId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, note: note || '' })
+      });
+    } catch (e) {}
+
+    const target = alerts.find(a => a.alert_id === alertId);
+    if (target) {
+      target.status = newStatus;
+      if (note !== null) target.note = note;
+    }
+
+    renderAlertMarkers();
+    renderAlertsList();
+    openDetail(target);
+  }
+
+  function switchTab(tab) {
+    document.getElementById('tabAlertsBtn').classList.toggle('active', tab === 'alerts');
+    document.getElementById('tabPlannerBtn').classList.toggle('active', tab === 'planner');
+    document.getElementById('tabAlerts').style.display = tab === 'alerts' ? 'flex' : 'none';
+    document.getElementById('tabPlanner').style.display = tab === 'planner' ? 'flex' : 'none';
+  }
+
+  function setFilter(filter, el) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    renderAlertsList();
+  }
+
+  function toggleZones() {
+    showZones = !showZones;
+    document.getElementById('btnToggleZones').classList.toggle('active', showZones);
+    renderZones();
+  }
+
+  function toggleHeatmap() {
+    showHeatmap = !showHeatmap;
+    document.getElementById('btnToggleHeatmap').classList.toggle('active', showHeatmap);
+    if (showHeatmap) {
+      loadHeatmapLayer();
+      heatmapLayer.addTo(map);
+    } else {
+      map.removeLayer(heatmapLayer);
+    }
+  }
+
+  function resetMapView() {
+    map.setView([38.7601, -77.5198], 18);
+  }
+
+  function loadHeatmapLayer() {
+    if (heatmapLayer.getLayers().length > 0) return;
+    const mockCells = [
+      { coords: [[38.7597, -77.5208], [38.7597, -77.5195], [38.7601, -77.5195], [38.7601, -77.5208]], val: 0.65 },
+      { coords: [[38.7601, -77.5208], [38.7601, -77.5195], [38.7605, -77.5195], [38.7605, -77.5208]], val: 0.42 },
+      { coords: [[38.7597, -77.5195], [38.7597, -77.5185], [38.7605, -77.5185], [38.7605, -77.5195]], val: 0.85 }
+    ];
+
+    mockCells.forEach(cell => {
+      L.polygon(cell.coords, {
+        color: '#ea580c',
+        fillColor: '#ea580c',
+        fillOpacity: cell.val * 0.4,
+        weight: 1
+      }).bindTooltip(`Turtle Likelihood: ${(cell.val * 100).toFixed(0)}% (Near Haul Road)`).addTo(heatmapLayer);
+    });
+  }
+
+  async function loadData() {
+    alerts = MOCK_ALERTS;
+    zones = MOCK_ZONES;
+    windows = MOCK_WINDOWS;
+
+    try {
+      const res = await fetch(`${API_BASE}/alerts`);
+      if (res.ok) alerts = await res.json();
+    } catch(e) {}
+    try {
+      const resZ = await fetch(`${API_BASE}/zones`);
+      if (resZ.ok) zones = await resZ.json();
+    } catch(e) {}
+    try {
+      const resW = await fetch(`${API_BASE}/plan`);
+      if (resW.ok) windows = await resW.json();
+    } catch(e) {}
+
+    renderZones();
+    renderAlertMarkers();
+    renderAlertsList();
+    renderFlightWindows();
+  }
+
+  initMap();
+  loadData();
+</script>
+
+</body>
+</html>
