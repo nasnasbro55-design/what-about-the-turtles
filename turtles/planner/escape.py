@@ -183,8 +183,14 @@ def run(ring, dem: dict | None, n=N_TURTLES, n_tracks=250):
         lon, lat = f.to_lonlat(np.array(lead)) if lead else ([], [])
         tracks.append({"lead": [[round(float(x), 7), round(float(y), 7)] for x, y in zip(lon, lat)],
                        "fence": paths[t][::2].tolist(), "freed_by": next((gaps.index(g) for g in gaps if visited[t, g]), None)})
+    # same turtles on flat ground: shows the pile-ups come from the terrain, not from chance or fence shape
+    f0 = Fence(ring, lambda lo, la: np.zeros(np.shape(lo)))
+    _, _, _, final0, paths0 = simulate(f0, n)
+    tr0, h0 = traps(f0, final0)
+    flat = {"tracks": [paths0[t][::2].tolist() for t in range(min(n_tracks, n))],
+            "max_share_pct": round(100 * float(h0.max()) / n, 1), "terrain_max_share_pct": round(100 * float(h.max()) / n, 1)}
     zf = f.z
-    return {"turtles": n, "walk_m": WALK_M, "step_m": STEP_M, "fence": fence_ll,
+    return {"flat": flat, "turtles": n, "walk_m": WALK_M, "step_m": STEP_M, "fence": fence_ll,
             "fence_elev_m": [round(float(z), 2) for z in zf], "terrain": dem.get("source", "USGS 3DEP") if dem is not None else "flat (no DEM)",
             "relief_m": round(float(zf.max() - zf.min()), 1),
             "traps": [{"fence_idx": int(i), "lonlat": ll(i)[0], "share_pct": round(100 * float(h[i]) / n, 1), "elev_m": round(float(zf[i]), 1)} for i in tr],
