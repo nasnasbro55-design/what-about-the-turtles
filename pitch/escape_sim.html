@@ -1,0 +1,69 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Turtle Escape Simulator</title>
+<style>
+:root{--bg:#14210f;--ink:#f3f1e6;--dim:#a9b59c;--turtle:#ffb547;--gap:#5be37d;--trap:#ff5a4f;--low:#58a6ff}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:-apple-system,Helvetica,Arial,sans-serif;overflow:hidden}
+canvas{display:block}
+#pick{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;font-size:20px}
+#pick small{color:var(--dim);font-size:15px;line-height:1.6;max-width:640px}
+#title{position:fixed;left:4vw;top:4vh;right:30vw;font-weight:700;font-size:3.6vh;line-height:1.25;text-shadow:0 2px 12px #000}
+#count{position:fixed;right:4vw;top:4vh;text-align:right}
+#count b{display:block;font-size:7vh;color:var(--gap);line-height:1}
+#count span{color:var(--dim);font-size:1.8vh}
+#foot{position:fixed;left:4vw;bottom:3vh;color:var(--dim);font-size:1.5vh}
+#keys{position:fixed;right:4vw;bottom:3vh;color:var(--dim);font-size:1.4vh;opacity:.7}
+</style></head><body>
+<div id="pick"><b>Turtle Escape Simulator</b><input type="file" id="file" accept=".json">
+<small>Pick <code>turtles/planner/out/escape.json</code> (made by <code>python3 -m turtles.planner.escape</code>).<br>
+<b>Space</b>/<b>→</b> next scene · <b>←</b> back · <b>R</b> replay · <b>F</b> fullscreen</small></div>
+<canvas id="c"></canvas><div id="title"></div><div id="count"></div><div id="foot"></div><div id="keys"></div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d'),T=document.getElementById('title'),N=document.getElementById('count'),F=document.getElementById('foot'),K=document.getElementById('keys');
+let D=null,scene=0,t=0,proj=null,exited=[],pops=[],willExit=1;
+const SPEED=0.6,DOT=3.2;
+document.getElementById('file').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(s=>{D=JSON.parse(s);document.getElementById('pick').remove();setup();go(0)})};
+function setup(){resize();addEventListener('resize',()=>{resize();});
+  F.textContent=`${D.turtles.toLocaleString()} virtual turtles · ${D.walk_m} m of fence-walking each · terrain: ${D.terrain} (${D.relief_m} m relief) · gaps kept off drainage low points for erosion control · a model, not field counts`;
+  K.textContent='Space next · ← back · R replay · F fullscreen'}
+function resize(){c.width=innerWidth*devicePixelRatio;c.height=innerHeight*devicePixelRatio;c.style.width=innerWidth+'px';c.style.height=innerHeight+'px';
+  if(!D)return;const lon=D.fence.map(p=>p[0]),lat=D.fence.map(p=>p[1]);const k=Math.cos(lat[0]*Math.PI/180);
+  const w=Math.min(...lon),e=Math.max(...lon),s=Math.min(...lat),n=Math.max(...lat);const W=c.width,H=c.height,pad=.12;
+  const sc=Math.min(W*(1-2*pad)/((e-w)*k),H*(1-2*pad)/(n-s));const ox=(W-(e-w)*k*sc)/2,oy=(H-(n-s)*sc)/2;
+  proj=p=>[ox+(p[0]-w)*k*sc,oy+(n-p[1])*sc]}
+const nGaps=()=>Math.min(scene,D.gaps.length);
+const open=()=>D.gaps.slice(0,nGaps()).map(g=>g.fence_idx);
+function go(s){scene=Math.max(0,Math.min(D.gaps.length,s));t=0;exited=D.tracks.map(()=>-1);pops=[];
+  const og=open(),n=D.fence.length;willExit=Math.max(1,D.tracks.filter(tr=>tr.fence.some(fi=>og.some(g=>Math.min(Math.abs(fi-g),n-Math.abs(fi-g))<=2))).length);
+  const g=nGaps();T.textContent=g===0?'Today: no way out. Trapped turtles walk the silt fence and pile up at the same few spots.'
+   :`${g===1?'One gap':g+' gaps'} in the right ${g===1?'spot':'spots'}: ${D.gaps[g-1].freed_cum_pct}% of turtles walk out on their own.`;
+  N.innerHTML=g?`<b>0%</b><span>walked out on their own</span>`:'';}
+function pos(tr,i){const L=tr.lead.length;if(i<L)return tr.lead[i];const j=Math.min(tr.fence.length-1,i-L);return D.fence[tr.fence[j]]}
+function frame(){if(!D){requestAnimationFrame(frame);return}
+  const W=c.width,H=c.height;x.fillStyle='#14210f';x.fillRect(0,0,W,H);
+  // fence, colored by elevation
+  const z=D.fence_elev_m,zl=Math.min(...z),zh=Math.max(...z);x.lineWidth=3*devicePixelRatio;
+  for(let i=0;i<D.fence.length;i++){const a=proj(D.fence[i]),b=proj(D.fence[(i+1)%D.fence.length]);const u=(z[i]-zl)/((zh-zl)||1);
+    x.strokeStyle=`hsl(${200-160*u},45%,${45+15*u}%)`;x.beginPath();x.moveTo(...a);x.lineTo(...b);x.stroke()}
+  x.fillStyle='rgba(88,166,255,.8)';for(const p of D.drainage_lows){const q=proj(p);x.beginPath();x.arc(q[0],q[1],3.5*devicePixelRatio,0,7);x.fill()}
+  const og=open(),done=t>=Math.max(...D.tracks.map(tr=>tr.lead.length+tr.fence.length));
+  // gaps
+  og.forEach((g,i)=>{const q=proj(D.fence[g]);x.strokeStyle='#5be37d';x.lineWidth=5*devicePixelRatio;x.beginPath();x.arc(q[0],q[1],14*devicePixelRatio,0,7);x.stroke();
+    x.fillStyle='#5be37d';x.font=`700 ${15*devicePixelRatio}px -apple-system,Helvetica`;x.fillText(`Gap ${i+1}`,q[0]+18*devicePixelRatio,q[1]-10*devicePixelRatio)});
+  // turtles
+  const ti=Math.floor(t);let out=0;
+  D.tracks.forEach((tr,k)=>{if(exited[k]>=0){out++;return}
+    const i=Math.min(ti,tr.lead.length+tr.fence.length-1),j=i-tr.lead.length;
+    if(j>=0&&og.length){const fi=tr.fence[Math.min(j,tr.fence.length-1)],n=D.fence.length;
+      if(og.some(g=>Math.min(Math.abs(fi-g),n-Math.abs(fi-g))<=2)){exited[k]=ti;pops.push({p:D.fence[fi],t:ti});out++;return}}
+    const q=proj(pos(tr,i));x.fillStyle='#ffb547';x.beginPath();x.arc(q[0],q[1],DOT*devicePixelRatio,0,7);x.fill()});
+  pops=pops.filter(p=>t-p.t<40);pops.forEach(p=>{const q=proj(p.p),a=1-(t-p.t)/40;x.strokeStyle=`rgba(91,227,125,${a})`;x.lineWidth=2*devicePixelRatio;x.beginPath();x.arc(q[0],q[1],(6+(t-p.t)*.8)*devicePixelRatio,0,7);x.stroke()});
+  if(og.length)N.querySelector('b').textContent=Math.round(Math.min(1,out/willExit)*D.gaps[og.length-1].freed_cum_pct)+'%';
+  // traps after the no-exit run
+  if(scene===0&&done)D.traps.forEach((tr,i)=>{const q=proj(tr.lonlat);x.strokeStyle='#ff5a4f';x.lineWidth=4*devicePixelRatio;x.beginPath();x.arc(q[0],q[1],22*devicePixelRatio,0,7);x.stroke();
+    x.fillStyle='#ff5a4f';x.font=`700 ${16*devicePixelRatio}px -apple-system,Helvetica`;x.fillText(`Trap ${i+1}`,q[0]+26*devicePixelRatio,q[1]+6*devicePixelRatio)});
+  if(!done)t+=SPEED;requestAnimationFrame(frame)}
+addEventListener('keydown',e=>{if(!D)return;const k=e.key.toLowerCase();
+  if(k===' '||k==='arrowright'){e.preventDefault();go(scene+1)}else if(k==='arrowleft')go(scene-1);else if(k==='r')go(scene);
+  else if(k==='f')document.documentElement.requestFullscreen?.()});
+requestAnimationFrame(frame);
+</script></body></html>
