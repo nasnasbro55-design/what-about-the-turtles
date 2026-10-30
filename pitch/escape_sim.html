@@ -11,12 +11,14 @@ canvas{display:block}
 #count b{display:block;font-size:7vh;color:var(--gap);line-height:1}
 #count span{color:var(--dim);font-size:1.8vh}
 #foot{position:fixed;left:4vw;bottom:3vh;color:var(--dim);font-size:1.5vh}
+#legend{position:fixed;left:4vw;bottom:7vh;font-size:1.6vh;color:var(--ink);line-height:1.9}
+#legend i{display:inline-block;width:1.1vh;height:1.1vh;border-radius:50%;margin-right:.8vh;vertical-align:middle}
 #keys{position:fixed;right:4vw;bottom:3vh;color:var(--dim);font-size:1.4vh;opacity:.7}
 </style></head><body>
 <div id="pick"><b>Turtle Escape Simulator</b><input type="file" id="file" accept=".json">
 <small>Pick <code>turtles/planner/out/escape.json</code> (made by <code>python3 -m turtles.planner.escape</code>).<br>
 <b>Space</b>/<b>→</b> next scene · <b>←</b> back · <b>R</b> replay · <b>F</b> fullscreen</small></div>
-<canvas id="c"></canvas><div id="title"></div><div id="count"></div><div id="foot"></div><div id="keys"></div>
+<canvas id="c"></canvas><div id="title"></div><div id="count"></div><div id="foot"></div><div id="keys"></div><div id="legend"><div><i style="background:#ffb547"></i>Trapped turtle</div><div><i style="background:#58a6ff"></i>Runoff low point: fence must stay closed (gaps kept 25 m+ away)</div><div><i style="border:2px solid #5be37d;width:.9vh;height:.9vh"></i>Exit gap</div><div style="color:var(--dim)">Fence color: <span style="color:hsl(200,45%,50%)">low</span> → <span style="color:hsl(40,45%,60%)">high</span> ground</div></div>
 <script>
 const c=document.getElementById('c'),x=c.getContext('2d'),T=document.getElementById('title'),N=document.getElementById('count'),F=document.getElementById('foot'),K=document.getElementById('keys');
 let D=null,scene=0,t=0,proj=null,exited=[],pops=[],willExit=1;
