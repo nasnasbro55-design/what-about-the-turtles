@@ -1,0 +1,17 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>A.E.R.O. field assistant</title>
+<style>body{margin:0;background:#0f180c;color:#f3f1e6;font:15px/1.5 -apple-system,Helvetica,Arial,sans-serif}
+header{padding:16px 20px;border-bottom:1px solid #2d4224}h1{margin:0;font-size:20px}header p{margin:4px 0 0;color:#a9b59c;font-size:13px}
+#list{padding:12px;max-width:640px}.a{display:flex;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:10px;margin-bottom:6px;background:#14210f;cursor:pointer;border:1px solid transparent}
+.a.on{border-color:#5be37d}.s{font-size:12px;color:#a9b59c;white-space:nowrap}.relocated{color:#5be37d}.confirmed{color:#ffb547}.false_positive{color:#ff5a4f}</style></head>
+<body><header><h1>A.E.R.O.</h1><p>Stand-in for Huy's app: tap a pin, then hold the A.E.R.O. button (or Space) and talk, or turn on Hands-free and say "Hey Aero". Try "where do I take it",
+"relocated, box turtle, about five inches", "next", "how many are left".</p></header><div id="list"></div>
+<script src="/hey-turtle.js"></script>
+<script>
+let cur=null;
+async function load(){const a=await (await fetch('/assistant/alerts')).json();if(!cur&&a.length)cur=a[0].alert_id;
+  document.getElementById('list').innerHTML=a.map(x=>`<div class="a ${x.alert_id===cur?'on':''}" data-id="${x.alert_id}"><span>${x.number}. ${x.name}</span>
+  <span class="s ${x.status}">${x.status.replace('_',' ')}${x.species?' · '+x.species:''}</span></div>`).join('');
+  document.querySelectorAll('.a').forEach(el=>el.onclick=()=>{cur=el.dataset.id;load()})}
+HeyTurtle.init({getAlertId:()=>cur,onAlertsChanged:load,onFocus:id=>{cur=id;load()}});load();
+</script></body></html>
