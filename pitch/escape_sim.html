@@ -1,0 +1,55 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Turtle Escape Simulator</title>
+<style>
+:root{--bg:#14210f;--ink:#f3f1e6;--dim:#a9b59c;--turtle:#ffb547;--gap:#5be37d;--corner:#ff5a4f}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:-apple-system,Helvetica,Arial,sans-serif;overflow:hidden}
+canvas{display:block}
+#pick{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;font-size:20px}
+#pick small{color:var(--dim);font-size:15px;line-height:1.6;max-width:660px}
+#title{position:fixed;left:4vw;top:4vh;right:28vw;font-weight:700;font-size:3.4vh;line-height:1.25;text-shadow:0 2px 12px #000}
+#sub{position:fixed;left:4vw;top:calc(4vh + 9vh);right:28vw;color:var(--dim);font-size:2vh}
+#count{position:fixed;right:4vw;top:4vh;text-align:right}
+#count b{display:block;font-size:7vh;color:var(--gap);line-height:1}
+#count span{color:var(--dim);font-size:1.8vh}
+#legend{position:fixed;left:4vw;bottom:7vh;font-size:1.6vh;line-height:1.9}
+#legend i{display:inline-block;width:1.1vh;height:1.1vh;border-radius:50%;margin-right:.8vh;vertical-align:middle}
+#foot{position:fixed;left:4vw;bottom:3vh;right:4vw;color:var(--dim);font-size:1.4vh}
+#keys{position:fixed;right:4vw;bottom:6vh;color:var(--dim);font-size:1.4vh;opacity:.75;text-align:right}
+</style></head><body>
+<div id="pick"><b>Turtle Escape Simulator</b><input type="file" id="file" accept=".json">
+<small>Pick <code>turtles/planner/out/escape.json</code> (made by <code>python3 -m turtles.planner.escape</code>).<br>
+<b>Space</b>/<b>→</b> next plan · <b>←</b> back · <b>D</b> deterrent what-if · <b>R</b> replay · <b>F</b> fullscreen</small></div>
+<canvas id="c"></canvas><div id="title"></div><div id="sub"></div><div id="count"></div><div id="legend"></div><div id="foot"></div><div id="keys"></div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d'),$=id=>document.getElementById(id);
+let D=null,scene=0,mi=0,t=0,proj=null,gone=[],pops=[];const SPEED=0.5,px=v=>v*devicePixelRatio;
+$('file').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(s=>{D=JSON.parse(s);if(D.version!==2){alert('Old escape.json: rerun python3 -m turtles.planner.escape');return}
+  $('pick').remove();resize();addEventListener('resize',resize);
+  $('legend').innerHTML='<div><i style="background:#ffb547"></i>Trapped turtle</div><div><i style="border:2px solid #ff5a4f;width:.9vh;height:.9vh"></i>Fence corner (turtles hesitate here)</div><div><i style="background:#5be37d;border-radius:2px"></i>Dirt ramp over the silt fence</div>';
+  $('foot').textContent=`${D.turtles.toLocaleString()} virtual turtles · each heads its own way (${Math.round(D.woods_share*100)}% toward the woods, for fall) · walks ${D.walk_ft[0]}–${D.walk_ft[1]} ft along the fence, then hunkers down · rules from Tanya Finch & Olivia LoBalbo · a model, not field counts`;
+  $('keys').textContent='Space next plan · ← back · D deterrent what-if · R replay · F fullscreen';go(0)})};
+function resize(){c.width=innerWidth*devicePixelRatio;c.height=innerHeight*devicePixelRatio;c.style.width=innerWidth+'px';c.style.height=innerHeight+'px';if(!D)return;
+  const lon=D.fence.map(p=>p[0]),lat=D.fence.map(p=>p[1]),k=Math.cos(lat[0]*Math.PI/180),w=Math.min(...lon),e=Math.max(...lon),s=Math.min(...lat),n=Math.max(...lat);
+  const W=c.width,H=c.height,sc=Math.min(W*.6/((e-w)*k),H*.7/(n-s)),ox=(W-(e-w)*k*sc)/2,oy=(H-(n-s)*sc)/2+H*.04;proj=p=>[ox+(p[0]-w)*k*sc,oy+(n-p[1])*sc]}
+const S=()=>D.scenarios[scene],M=()=>String(D.deterrent_mult[mi].toFixed(1));
+function go(s){scene=Math.max(0,Math.min(D.scenarios.length-1,s));t=0;gone=D.tracks.map(()=>false);pops=[];const sc=S(),m=D.deterrent_mult[mi];
+  $('title').textContent=scene===0?'Today: no way out. Turtles walk the silt fence 50–100 ft, give up, and hunker down along it.':`${sc.title}: ${sc.escaped_pct[M()]}% walk out on their own.`;
+  $('sub').textContent=(scene===0?'Tanya usually finds them within 6–10 ft of the fence.':`${sc.n_ramps} ramps around ${D.fence_m.toLocaleString()} m of fence`)+(m>1?` · What if a deterrent kept them searching ${m}× as far?`:'');
+  $('count').innerHTML=scene?'<b>0%</b><span>walked out on their own</span>':''}
+function end(tr){return Math.min(tr.fence.length-1,Math.round(tr.walk*D.deterrent_mult[mi]))}
+function frame(){if(!D||!proj){requestAnimationFrame(frame);return}const W=c.width,H=c.height,sc=S(),ex=sc.exit_step[M()];
+  x.fillStyle='#14210f';x.fillRect(0,0,W,H);x.strokeStyle='#6f8f5f';x.lineWidth=px(3);x.beginPath();D.fence.forEach((p,i)=>{const q=proj(p);i?x.lineTo(...q):x.moveTo(...q)});x.closePath();x.stroke();
+  for(const r of sc.ramps){const q=proj(D.fence[r]);x.fillStyle='#5be37d';x.fillRect(q[0]-px(4),q[1]-px(4),px(8),px(8))}
+  for(const cn of D.corners){const q=proj(cn.lonlat);x.strokeStyle='#ff5a4f';x.lineWidth=px(2.5);x.beginPath();x.arc(q[0],q[1],px(13),0,7);x.stroke()}
+  const ti=Math.floor(t);let out=0,will=0,done=true;
+  D.tracks.forEach((tr,k)=>{const L=tr.lead.length,e=ex[k],stopAt=e>=0?e:end(tr);if(e>=0)will++;if(ti<L+stopAt)done=false;
+    if(e>=0&&ti>=L+e){out++;if(!gone[k]){gone[k]=true;pops.push({p:D.fence[tr.fence[e]],t:ti})}return}
+    const p=ti<L?tr.lead[ti]:D.fence[tr.fence[Math.min(ti-L,stopAt)]],q=proj(p);x.fillStyle='#ffb547';x.beginPath();x.arc(q[0],q[1],px(3.2),0,7);x.fill()});
+  pops=pops.filter(p=>t-p.t<40);pops.forEach(p=>{const q=proj(p.p),a=1-(t-p.t)/40;x.strokeStyle=`rgba(91,227,125,${a})`;x.lineWidth=px(2);x.beginPath();x.arc(q[0],q[1],px(6+(t-p.t)*.8),0,7);x.stroke()});
+  if(scene)$('count').querySelector('b').textContent=Math.round(will?Math.min(1,out/will)*sc.escaped_pct[M()]:0)+'%';
+  if(!done)t+=SPEED;requestAnimationFrame(frame)}
+addEventListener('keydown',e=>{if(!D)return;const k=e.key.toLowerCase();
+  if(k===' '||k==='arrowright'){e.preventDefault();go(scene+1)}else if(k==='arrowleft')go(scene-1);else if(k==='r')go(scene);
+  else if(k==='d'){mi=(mi+1)%D.deterrent_mult.length;go(scene)}else if(k==='f')document.documentElement.requestFullscreen?.()});
+requestAnimationFrame(frame);
+</script></body></html>
