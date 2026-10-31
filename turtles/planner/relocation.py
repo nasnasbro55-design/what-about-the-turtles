@@ -135,7 +135,21 @@ if __name__ == "__main__":
     ap.add_argument("--heading", type=float, help="direction it was walking, degrees from north")
     ap.add_argument("--species", default="box", help="box (default), snapping, aquatic")
     ap.add_argument("--heatmap", default=str(HEATMAP))
+    ap.add_argument("--points", help="GeoJSON of turtle points (batch mode): writes --out with one suggestion per point")
+    ap.add_argument("--out", help="batch output JSON (used by pitch/voice_assistant.html)")
     a = ap.parse_args()
+    if a.points:
+        cells = load_cells(a.heatmap); pack = []
+        for i, f in enumerate(json.loads(Path(a.points).read_text())["features"]):
+            lon, lat = f["geometry"]["coordinates"][:2]; pr = f.get("properties", {})
+            label = pr.get("name") or (f"Spot {pr['spot']}: {pr['ground']}" if "spot" in pr else f"Pin {i + 1}")
+            sp = "snapping" if "snap" in str(pr.get("note", "")).lower() else a.species
+            s = suggest(str(pr.get("alert_id", f"pin-{i + 1}")), lat, lon, cells, a.heading, sp)
+            aq = suggest(s.alert_id, lat, lon, cells, a.heading, "snapping")
+            pack.append({"alert_id": s.alert_id, "label": label, "lat": lat, "lon": lon, "suggestion": asdict(s),
+                         "suggestion_snapping": asdict(aq)})
+        out = Path(a.out or Path(a.heatmap).parent / "relocations.json"); out.write_text(json.dumps(pack, indent=1))
+        print(f"{len(pack)} suggestions -> {out}"); raise SystemExit
     if a.alerts:
         al = next(x for x in load(Alert, a.alerts) if x.alert_id == a.id)
         aid, lat, lon = al.alert_id, al.lat, al.lon
