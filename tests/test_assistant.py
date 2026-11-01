@@ -73,3 +73,23 @@ def test_history_is_cleaned_before_claude_sees_it():
     h = [{"role": "assistant", "content": "hi"}, {"role": "user", "content": "a"}, {"role": "assistant", "content": ""},
          {"role": "user", "content": "b"}, {"role": "assistant", "content": "ok"}, {"role": "user", "content": "dangling"}]
     assert clean_history(h) == [{"role": "user", "content": "b"}, {"role": "assistant", "content": "ok"}]
+
+
+def test_alerts_served_to_huys_app_match_the_contract(tmp_path):
+    from dataclasses import fields
+    from turtles.backend.assistant import as_contract
+    from turtles.contracts import Alert
+    s = store(tmp_path); s.update("spot-1", status="relocated", species="Eastern box turtle", sex="Male", est_length_in=5)
+    a = as_contract(s.get("spot-1"))
+    assert {f.name for f in fields(Alert)} <= set(a) and a["status"] == "relocated"
+    assert "Eastern box turtle, male, about 5 in" in a["note"] and a["score"] is None and a["label"].startswith("Spot 1")
+
+
+def test_every_route_huys_app_calls_is_served():
+    import re
+    from pathlib import Path
+    src = (Path(__file__).parents[1] / "turtles" / "backend" / "assistant.py").read_text()
+    routes = set(re.findall(r'@r\.(?:get|post|patch)\("([^"]+)"\)', src))
+    app = (Path(__file__).parents[1] / "turtles" / "ui_docs" / "index.html").read_text()
+    called = {re.sub(r"\$\{[^}]+\}", "{alert_id}", u) for u in re.findall(r"\$\{API_BASE\}(/[^`'\"?]+)", app)}
+    assert called and called <= routes, f"app calls routes the server lacks: {called - routes}"
