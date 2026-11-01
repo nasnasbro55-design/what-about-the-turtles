@@ -7,6 +7,7 @@
  * Hold the big button (or Space) and talk. "Hands-free" listens for "Hey Aero ...". Typed box = backup.
  * Speech-to-text uses the browser (Chrome / Edge / Safari); the phone needs https or localhost for the mic.
  * Voice out: ElevenLabs through the server if it has ELEVENLABS_API_KEY, else the device's best built-in voice.
+ * Options: position: 'left' puts the button and panel bottom-left (default bottom-right).
  * React: call HeyTurtle.init(...) once in a useEffect; it adds its own button and cleans nothing up you own. */
 (function () {
   const css = `#ht-btn{position:fixed;right:18px;bottom:18px;width:72px;height:72px;border-radius:50%;border:none;z-index:9999;
@@ -76,6 +77,7 @@
       document.body.insertAdjacentHTML('beforeend', `<div id="ht-panel"><div id="ht-log"></div><div id="ht-mode"></div>
         <div id="ht-row"><input id="ht-in" placeholder="Type instead…"><button id="ht-hf">Hands-free</button><button id="ht-x">✕</button></div></div>
         <button id="ht-btn" aria-label="Hold to talk to A.E.R.O.">A.E.R.O.<br><small style="font-weight:400">hold to talk</small></button>`);
+      if (c.position === 'left') { $('#ht-btn').style.left = $('#ht-panel').style.left = '18px'; $('#ht-btn').style.right = $('#ht-panel').style.right = 'auto'; }
       const b = $('#ht-btn');
       b.addEventListener('pointerdown', e => { e.preventDefault(); start(); }); b.addEventListener('pointerup', stop); b.addEventListener('pointerleave', stop);
       $('#ht-in').addEventListener('keydown', e => { if (e.key === 'Enter') { send(e.target.value); e.target.value = ''; } });
