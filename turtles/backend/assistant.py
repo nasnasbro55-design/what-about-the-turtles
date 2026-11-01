@@ -317,15 +317,114 @@ def router(store: AlertStore):
     return r
 
 
-def create_app(store: AlertStore):
+def as_contract(a: Dict[str, Any]) -> Dict[str, Any]:
+    """An alert in the shape of contracts.Alert, which Huy's app reads (plus a few extras it ignores)."""
+    parts = []
+    if a.get("species"): parts.append(a["species"] + (f", {a['sex'].lower()}" if a.get("sex") else "")
+                                      + (f", about {a['est_length_in']:g} in" if a.get("est_length_in") else ""))
+    parts += a.get("notes", [])
+    return {"alert_id": a["alert_id"], "site_id": a.get("site_id", "grayson"), "flight_id": a.get("flight_id", "F-20261024"),
+            "lat": a["lat"], "lon": a["lon"], "confidence": a.get("confidence", "review"), "score": a.get("score"),   # None = test spot, no detector score yet
+            "sensors": a.get("sensors", ["rgb"]), "detection_ids": a.get("detection_ids", []), "thumbnail": a.get("thumbnail", ""),
+            "created_at": a.get("created_at", "2026-10-24T15:00:00Z"), "status": a["status"],
+            "note": a.get("note") or " · ".join(x for x in parts if x), "number": a.get("number"), "species": a.get("species", ""),
+            "label": a.get("name") or a["alert_id"]}
+
+
+_heat_cache: Dict[str, Any] = {}
+
+
+def app_router(store: AlertStore, mock_zones: bool):
+    """The endpoints Huy's app calls (ARCHITECTURE section 6), served from the same store A.E.R.O. updates,
+    until Ethan's api.py takes over. Then he keeps these routes and swaps the store for SQLite."""
+    from fastapi import APIRouter, HTTPException
+    from pydantic import BaseModel
+
+    class Patch(BaseModel):
+        status: Optional[str] = None
+        note: Optional[str] = None
+
+    r = APIRouter(); mock = ROOT / "architecture" / "mock"
+
+    @r.get("/alerts")
+    def alerts(): return [as_contract(a) for a in store.list()]
+
+    @r.get("/alerts/{alert_id}/relocation")
+    def relocation(alert_id: str):
+        a = store.get(alert_id)
+        if a is None: raise HTTPException(404, "no such alert")
+        rel = store.relocation(alert_id, "snapping" if "snap" in a.get("species", "").lower() else "box")
+        return {"alert_id": a["alert_id"], **rel}
+
+    @r.patch("/alerts/{alert_id}")
+    def patch(alert_id: str, p: Patch):
+        a = store.get(alert_id)
+        if a is None: raise HTTPException(404, "no such alert")
+        if p.status in STATUSES: a["status"] = p.status
+        if p.note is not None: a["note"] = p.note
+        a["updated_at"] = datetime.now().strftime("%H:%M")
+        return as_contract(a)
+
+    @r.get("/zones")
+    def zones():
+        if mock_zones: return json.loads((mock / "zones.json").read_text())
+        site = ROOT / "planner" / "sites" / "grayson.geojson"   # real site: show the traced boundary (no work zones yet)
+        if not site.exists(): return []
+        ring = json.loads(site.read_text())["features"][0]["geometry"]["coordinates"][0]
+        return [{"zone_id": "SITE", "site_id": "grayson", "name": "Grayson Overlook site boundary",
+                 "polygon": [[round(la, 6), round(lo, 6)] for lo, la in ring], "work": "active construction", "work_starts": None}]
+
+    @r.get("/plan")
+    def plan(): return json.loads((mock / "windows.json").read_text())   # planner windows (sample until live forecast is wired in)
+
+    @r.get("/heatmap")
+    def heatmap(min_likelihood: float = 0.5, min_on_site: float = 0.2, band_m: float = 60):
+        """F2 turtle-likelihood cells within band_m of the site fence (Tanya finds turtles within 6-10 ft of it):
+        inside the fence = where trapped turtles likely are; outside = the woods they come from. Light enough for a phone."""
+        hm = ROOT / "planner" / "out" / "heatmap.geojson"
+        if not hm.exists(): raise HTTPException(404, "no heat map yet: run python3 -m turtles.planner.habitat ...")
+        key = (min_likelihood, min_on_site, band_m, hm.stat().st_mtime)
+        if _heat_cache.get("key") == key: return _heat_cache["fc"]
+        site = ROOT / "planner" / "sites" / "grayson.geojson"
+        ring = json.loads(site.read_text())["features"][0]["geometry"]["coordinates"][0] if site.exists() else None
+        if ring:
+            import math
+            lat0 = sum(p[1] for p in ring) / len(ring); kx, ky = 111_320 * math.cos(math.radians(lat0)), 111_320
+            seg = [((x1 * kx, y1 * ky), (x2 * kx, y2 * ky)) for (x1, y1), (x2, y2) in zip(ring, ring[1:])]
+            def fence_dist(x, y):
+                px, py, best = x * kx, y * ky, 1e18
+                for (ax, ay), (bx, by) in seg:
+                    dx, dy = bx - ax, by - ay; t = max(0, min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy or 1)))
+                    best = min(best, (px - ax - t * dx) ** 2 + (py - ay - t * dy) ** 2)
+                return best ** 0.5
+        keep = []
+        for f in json.loads(hm.read_text())["features"]:
+            pr = f["properties"]
+            # inside the fence (cleared ground, where trapped turtles are) scores lower by design, so it gets its own cutoff
+            if pr.get("likelihood", 0) < (min_on_site if pr.get("on_site") else min_likelihood): continue
+            pts = f["geometry"]["coordinates"][0]
+            if ring:
+                cx, cy = sum(p[0] for p in pts[:4]) / 4, sum(p[1] for p in pts[:4]) / 4
+                if fence_dist(cx, cy) > band_m: continue
+            keep.append({"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[round(x, 6), round(y, 6)] for x, y in pts]]},
+                         "properties": {"likelihood": pr["likelihood"], "on_site": pr.get("on_site", False), "why": (pr.get("reasons") or [""])[0]}})
+        _heat_cache.update(key=key, fc={"type": "FeatureCollection", "features": keep})
+        return _heat_cache["fc"]
+
+    return r
+
+
+def create_app(store: AlertStore, mock_zones: bool = False):
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import FileResponse
     app = FastAPI(title="A.E.R.O. field assistant")
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
     app.include_router(router(store))
+    app.include_router(app_router(store, mock_zones))
     ui = ROOT / "ui_docs"
-    app.get("/")(lambda: FileResponse(ui / "hey_turtle_demo.html"))
+    app.get("/")(lambda: FileResponse(ui / "index.html"))                  # Huy's responder app, A.E.R.O. built in
+    app.get("/demo")(lambda: FileResponse(ui / "hey_turtle_demo.html"))    # bare A.E.R.O. test page
     app.get("/hey-turtle.js")(lambda: FileResponse(ui / "hey-turtle.js", media_type="text/javascript"))
     return app
 
@@ -338,5 +437,5 @@ if __name__ == "__main__":
     import uvicorn
     print(f"A.E.R.O.: {len(store.alerts)} alerts, model {MODEL}, "
           f"{'Claude' if os.environ.get('ANTHROPIC_API_KEY') else 'OFFLINE mode (no ANTHROPIC_API_KEY)'}, "
-          f"voice: {'ElevenLabs' if os.environ.get('ELEVENLABS_API_KEY') else 'browser'} -> http://localhost:{a.port}")
-    uvicorn.run(create_app(store), host="0.0.0.0", port=a.port)
+          f"voice: {'ElevenLabs' if os.environ.get('ELEVENLABS_API_KEY') else 'browser'} -> app http://localhost:{a.port}  (bare test page: /demo)")
+    uvicorn.run(create_app(store, mock_zones=not a.pack), host="0.0.0.0", port=a.port)
