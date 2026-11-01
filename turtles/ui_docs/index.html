@@ -674,7 +674,8 @@
   };
 
   function initMap() {
-    map = L.map('map', { zoomControl: true }).setView([38.7601, -77.5198], 18);
+    map = L.map('map', { zoomControl: false }).setView([38.7601, -77.5198], 18);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);   // [A.E.R.O. integration] keep +/- clear of the map buttons
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 21,
@@ -700,8 +701,8 @@
         dashArray: '5, 5'
       }).addTo(zonesLayer);
 
-      const label = `${z.name} (${z.work.toUpperCase()})<br><small>Starts: ${new Date(z.work_starts).toLocaleDateString()}</small>`;
-      polygon.bindTooltip(label, { permanent: true, direction: 'center', className: 'zone-label' });
+      const label = `${z.name} (${z.work.toUpperCase()})` + (z.work_starts ? `<br><small>Starts: ${new Date(z.work_starts).toLocaleDateString()}</small>` : '');
+      polygon.bindTooltip(label, { permanent: z.zone_id !== 'SITE', direction: 'center', className: 'zone-label' });  // [A.E.R.O. integration] site boundary label on hover only
     });
   }
 
@@ -727,12 +728,16 @@
 
       marker.on('click', () => openDetail(alert));
 
-      marker.bindTooltip(`<strong>${alert.alert_id}</strong><br>${alert.confidence.toUpperCase()} - ${alert.status}`, {
+      marker.bindTooltip(`<strong>${alertName(alert)}</strong><br>${alert.confidence.toUpperCase()} - ${alert.status}`, {
         direction: 'top',
         offset: [0, -8]
       });
     });
   }
+
+  // [A.E.R.O. integration] friendly name + honest score for hidden-shell test spots (no detector score yet)
+  const alertName = a => a.label || a.alert_id;
+  const scoreText = a => a.score == null ? 'Test spot · no detector score yet' : `Score: ${(a.score * 100).toFixed(0)}%`;
 
   function renderAlertsList() {
     const container = document.getElementById('alertsListContainer');
@@ -759,10 +764,10 @@
         <div class="alert-thumb-box">🐢</div>
         <div class="alert-info">
           <div class="alert-meta">
-            <span class="alert-id">${alert.alert_id}</span>
+            <span class="alert-id">${alertName(alert)}</span>
             <span class="badge-conf ${confBadgeClass}">${confText}</span>
           </div>
-          <div style="font-size:0.8125rem; font-weight:600;">Score: ${(alert.score * 100).toFixed(0)}%</div>
+          <div style="font-size:0.8125rem; font-weight:600;">${scoreText(alert)}</div>
           <div class="sensors-row">
             ${alert.sensors.map(s => `<span class="sensor-tag ${s === 'thermal' ? 'sensor-thermal' : ''}">${s.toUpperCase()}</span>`).join('')}
           </div>
@@ -806,8 +811,8 @@
 
   async function openDetail(alert) {
     activeAlert = alert;
-    document.getElementById('detailAlertId').innerText = alert.alert_id;
-    document.getElementById('detailScore').innerText = `Score: ${(alert.score * 100).toFixed(0)}%`;
+    document.getElementById('detailAlertId').innerText = alertName(alert);
+    document.getElementById('detailScore').innerText = scoreText(alert);
     document.getElementById('detailSensors').innerText = alert.sensors.map(s => s.toUpperCase()).join(' + ');
     document.getElementById('detailTime').innerText = alert.created_at;
     document.getElementById('detailCoords').innerText = `${alert.lat.toFixed(6)}, ${alert.lon.toFixed(6)}`;
@@ -935,11 +940,31 @@
   }
 
   function resetMapView() {
-    map.setView([38.7601, -77.5198], 18);
+    // [A.E.R.O. integration] fit to wherever the alerts are (mock lot or the real Grayson spots)
+    if (alerts.length) map.fitBounds(L.latLngBounds(alerts.map(a => [a.lat, a.lon])).pad(0.35), { maxZoom: 19 });
+    else map.setView([38.7601, -77.5198], 18);
   }
 
-  function loadHeatmapLayer() {
+  async function loadHeatmapLayer() {
     if (heatmapLayer.getLayers().length > 0) return;
+    // [A.E.R.O. integration] real F2 heat map from the server; the mock squares below are the fallback
+    try {
+      const res = await fetch(`${API_BASE}/heatmap`);
+      if (res.ok) {
+        const fc = await res.json();
+        L.geoJSON(fc, {
+          renderer: L.canvas(),
+          // inside the fence: red, strongest at the fence (check here first) · outside: green woods turtles come from
+          style: f => f.properties.on_site
+            ? { stroke: false, fillColor: '#dc2626', fillOpacity: Math.min(0.75, 0.1 + f.properties.likelihood * 1.3) }
+            : { stroke: false, fillColor: '#16a34a', fillOpacity: 0.12 + (f.properties.likelihood - 0.5) * 0.6 },
+          onEachFeature: (f, layer) => layer.bindTooltip(f.properties.on_site
+            ? `Inside the fence: check here (likelihood ${(f.properties.likelihood * 100).toFixed(0)}%)`
+            : `Woods turtles come from (habitat ${(f.properties.likelihood * 100).toFixed(0)}%)`),
+        }).addTo(heatmapLayer);
+        return;
+      }
+    } catch (e) {}
     const mockCells = [
       { coords: [[38.7597, -77.5208], [38.7597, -77.5195], [38.7601, -77.5195], [38.7601, -77.5208]], val: 0.65 },
       { coords: [[38.7601, -77.5208], [38.7601, -77.5195], [38.7605, -77.5195], [38.7605, -77.5208]], val: 0.42 },
@@ -978,10 +1003,39 @@
     renderAlertMarkers();
     renderAlertsList();
     renderFlightWindows();
+    if (!fittedToAlerts && alerts.length) { fittedToAlerts = true; resetMapView(); }  // [A.E.R.O. integration] real site, not the mock lot
   }
+  let fittedToAlerts = false;
 
   initMap();
   loadData();
+</script>
+
+<!-- [A.E.R.O. integration] voice assistant: big "hold to talk" button, "Hey Aero" hands-free. Server: turtles/backend/assistant.py -->
+<script>
+  (function loadAero() {
+    const s = document.createElement('script');
+    s.src = API_BASE + '/hey-turtle.js';
+    s.onload = () => HeyTurtle.init({
+      apiBase: API_BASE,
+      position: 'left',          // sit over the map, not on top of the alert list
+      getAlertId: () => (activeAlert ? activeAlert.alert_id : null),
+      // A.E.R.O. logged something: refresh pins and the open detail panel
+      onAlertsChanged: async () => {
+        const id = activeAlert && activeAlert.alert_id;
+        await loadData();
+        const a = id && alerts.find(x => x.alert_id === id);
+        if (a) openDetail(a);
+      },
+      // A.E.R.O. moved on ("next"): open that pin on the map
+      onFocus: id => {
+        if (activeAlert && activeAlert.alert_id === id) return;
+        const a = alerts.find(x => x.alert_id === id);
+        if (a) { openDetail(a); map.panTo([a.lat, a.lon]); }
+      },
+    });
+    document.body.appendChild(s);
+  })();
 </script>
 
 </body>
