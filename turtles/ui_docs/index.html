@@ -39,7 +39,7 @@
     :root, :root[data-theme="dark"] {
       --bg: #0A140D; --panel: #0F1D14; --panel-2: #050B07; --line: #1C2E21; --line-strong: #2B4433;
       --ink: #E6EDE7; --muted: #9FB3A5; --accent: #4ADE80; --accent-text: #4ADE80; --accent-soft: rgba(74,222,128,.10);
-      --high: #F87171; --review: #FBBF24; --reloc: #4ADE80; --false: #6B7C70; --on-pin: #0A140D;
+      --high: #F87171; --review: #FBBF24; --reloc: #4ADE80; --false: #6B7C70; --on-pin: #0A140D; --me: #38BDF8;
       --shadow: 0 10px 28px rgba(0,0,0,.45); --map-bg: #0C1910;
       --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-mono: 'JetBrains Mono', ui-monospace, monospace;
@@ -49,7 +49,7 @@
     :root[data-theme="light"] {
       --bg: #EEF3EF; --panel: #FFFFFF; --panel-2: #F6F9F6; --line: #CFDCD2; --line-strong: #B5C7B9;
       --ink: #052E16; --muted: #4B5F52; --accent: #16A34A; --accent-text: #14532D; --accent-soft: rgba(22,163,74,.10);
-      --high: #B91C1C; --review: #B45309; --reloc: #15803D; --false: #6B7280; --on-pin: #FFFFFF;
+      --high: #B91C1C; --review: #B45309; --reloc: #15803D; --false: #6B7280; --on-pin: #FFFFFF; --me: #0284C7;
       --shadow: 0 8px 22px rgba(5,46,22,.10); --map-bg: #E4EBE3;
       color-scheme: light;
     }
@@ -253,6 +253,44 @@
       html body.sheet-down #ht-dock { bottom: calc(92px + env(safe-area-inset-bottom)); }
       html body.detail-open #ht-dock { bottom: auto; top: calc(70px + env(safe-area-inset-top)); right: auto; left: 12px; flex-direction: column; }
     }
+    .btn-nav-gmaps { width: 100%; cursor: pointer; }
+    /* [A.E.R.O. field] you-are-here dot (blue, so it never reads as a turtle status), heading cone, accuracy ring */
+    .me { position: relative; width: 22px; height: 22px; }
+    .me .me-dot { position: absolute; inset: 3px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.45); }
+    .me .me-pulse { position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--me); opacity: 0; animation: mePing 2.2s ease-out infinite; }
+    .me .me-cone { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; display: none; background: conic-gradient(from -28deg, color-mix(in srgb, var(--me) 55%, transparent) 0deg, transparent 56deg, transparent 360deg); border-radius: 50%; -webkit-mask: radial-gradient(circle, #000 30%, transparent 72%); mask: radial-gradient(circle, #000 30%, transparent 72%); }
+    .me.has-head .me-cone { display: block; }
+    .me.stale .me-dot { background: var(--false); }
+    @keyframes mePing { 0% { transform: scale(.6); opacity: .8; } 100% { transform: scale(1.8); opacity: 0; } }
+    .nav-target { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--me); box-shadow: 0 0 0 6px color-mix(in srgb, var(--me) 18%, transparent); animation: mePing 2s ease-out infinite; }
+    #mapTop { position: absolute; z-index: 960; top: 20px; left: calc((100% - 400px) / 2); transform: translateX(-50%); width: min(380px, calc(100% - 520px)); display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    #mapTop > * { pointer-events: auto; }
+    #locBar { display: none; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 6px; background: var(--panel); border: 1px solid var(--review); color: var(--ink); box-shadow: var(--shadow); font-family: var(--font-sans); font-size: 13px; line-height: 1.4; }
+    #locBar.on { display: flex; } #locBar .lb-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--review); flex-shrink: 0; }
+    #locBar span#locText { flex: 1; }
+    #locRetry { flex-shrink: 0; min-height: 36px; padding: 0 12px; border-radius: 4px; border: 1px solid var(--line-strong); background: transparent; color: var(--accent-text); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; cursor: pointer; }
+    #navHud { display: none; flex-direction: column; gap: 10px; padding: 12px; border-radius: 8px; background: var(--panel); border: 1px solid var(--me); box-shadow: var(--shadow); }
+    body.nav-on #navHud { display: flex; }
+    #navHud .nh-row { display: flex; align-items: center; gap: 14px; }
+    .nh-arrow { width: 64px; height: 64px; flex-shrink: 0; transition: transform .25s linear; }
+    .nh-arrow .nh-ring { fill: none; stroke: var(--line-strong); stroke-width: 1.5; } .nh-arrow .nh-tip { fill: var(--me); }
+    #navHud.arrived .nh-arrow .nh-tip { fill: var(--reloc); } #navHud.arrived { border-color: var(--reloc); } #navHud.arrived .nh-dist { font-size: 26px; }
+    .nh-main { flex: 1; min-width: 0; }
+    .nh-to { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nh-dist { font-family: var(--font-display); font-weight: 300; font-size: 34px; line-height: 1.1; color: var(--ink); }
+    .nh-dist small { font-family: var(--font-mono); font-size: 12px; letter-spacing: .1em; color: var(--muted); margin-left: 8px; }
+    .nh-sub { font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); }
+    .nh-stop { width: 44px; height: 44px; flex-shrink: 0; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+    .nh-next { display: none; min-height: 48px; border-radius: 6px; border: 1px solid var(--reloc); background: color-mix(in srgb, var(--reloc) 14%, var(--panel)); color: var(--ink); font-family: var(--font-display); font-weight: 500; font-size: 14px; letter-spacing: .16em; text-transform: uppercase; cursor: pointer; }
+    .nh-next.on { display: block; }
+    #meChip { position: absolute; z-index: 955; display: none; align-items: center; gap: 7px; height: 34px; padding: 0 12px 0 9px; border-radius: 17px; transform: translate(-50%, -50%); border: 1px solid var(--me); background: var(--panel); color: var(--ink); box-shadow: var(--shadow); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
+    #meChip.on { display: inline-flex; }
+    #meChip svg { width: 15px; height: 15px; flex-shrink: 0; fill: var(--me); }
+    @media (max-width: 1100px) { #mapTop { left: 260px; transform: none; width: auto; right: 420px; } }
+    @media (max-width: 768px) { body.detail-open #mapTop { left: 84px; } body.detail-open.nav-on #mapTop { left: 12px; }
+      html body.detail-open.nav-on #ht-dock { top: auto; left: auto; right: 14px; bottom: calc(164px + env(safe-area-inset-bottom)); flex-direction: column-reverse; }
+      #mapTop { top: 12px; left: 12px; right: 68px; width: auto; transform: none; } .nh-arrow { width: 54px; height: 54px; } .nh-dist { font-size: 28px; } }
+    @media (prefers-reduced-motion: reduce) { .me .me-pulse, .nav-target { animation: none; } .nh-arrow { transition: none; } }
     /* [A.E.R.O. UI] after ENTER the dashboard boots in with a glitch: panels slice in, the map flickers on, a scan line runs down */
     body.aero-boot header, body.aero-boot .sidebar, body.aero-boot .map-floating-panel, body.aero-boot .map-legend, body.aero-boot #ht-dock, body.aero-boot .leaflet-control-zoom { animation: bootIn .75s steps(1, end) both; }
     body.aero-boot .sidebar { animation-delay: .12s; } body.aero-boot .map-floating-panel { animation-delay: .26s; } body.aero-boot .map-legend { animation-delay: .38s; }
@@ -282,6 +320,7 @@
     <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
     <symbol id="i-nav" viewBox="0 0 24 24"><path d="M12 2l7 19-7-4-7 4z"/></symbol>
+    <symbol id="i-me" viewBox="0 0 24 24"><path d="M3.5 10.5L20.5 3.5l-7 17-2.2-7.8z"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
     <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
@@ -323,7 +362,29 @@
       <button class="btn-map-tool" onclick="resetMapView()" title="Recenter site">
         <svg class="icon"><use href="#i-recenter"/></svg><span class="t">Recenter site</span>
       </button>
+      <button class="btn-map-tool" id="btnLocate" onclick="locateMe()" title="My location">
+        <svg class="icon"><use href="#i-me"/></svg><span class="t">My location</span>
+      </button>
     </div>
+
+    <!-- [A.E.R.O. field] live location bar + in-app guidance to the turtle and its release point -->
+    <div id="mapTop">
+      <div id="locBar" role="status" aria-live="polite"><span class="lb-dot"></span><span id="locText"></span><button type="button" id="locRetry" onclick="startLocation(true)">Retry</button></div>
+      <div id="navHud" role="region" aria-label="Guidance" aria-live="polite">
+        <div class="nh-row">
+          <svg class="nh-arrow" id="navArrow" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22" class="nh-ring"/><path d="M24 6l10 30-10-6-10 6z" class="nh-tip"/></svg>
+          <div class="nh-main">
+            <div class="nh-to" id="navTo">To turtle</div>
+            <div class="nh-dist" id="navDist">--</div>
+            <div class="nh-sub" id="navSub">Waiting for GPS</div>
+          </div>
+          <button type="button" class="nh-stop" onclick="stopNav()" aria-label="Stop guidance"><svg class="icon"><use href="#i-x"/></svg></button>
+        </div>
+        <button type="button" class="nh-next" id="navNext"></button>
+      </div>
+    </div>
+
+    <button type="button" id="meChip" onclick="locateMe()" aria-label="You're off screen: show my location"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 18-7-4-7 4z"/></svg><span></span></button>
 
     <div class="map-legend" aria-label="Map legend">
       <span><svg class="lg-pin" viewBox="0 0 64 64" style="--c:var(--high)"><path d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/></svg>High</span>
@@ -395,9 +456,9 @@
           <ul class="relocation-reasons-list" id="relocationReasons"></ul>
         </div>
 
-        <a id="btnNavMaps" class="btn-nav-gmaps" href="#" target="_blank" rel="noopener">
+        <button type="button" id="btnNavMaps" class="btn-nav-gmaps" onclick="startNav('turtle')">
           <svg class="icon"><use href="#i-nav"/></svg> NAVIGATE TO TURTLE
-        </a>
+        </button>
 
         <div>
           <span class="lbl">Responder action</span>
@@ -606,6 +667,8 @@
     if (!map) return;   // the tiles restyle through CSS; pins, zones and the heat map re-read the theme colors
     renderZones(); renderAlertMarkers(); restyleHeatmap();
     if (activeAlert && lastRelocation) renderRelocationGuide(activeAlert, lastRelocation);
+    if (meAcc) meAcc.setStyle({ color: css('--me'), fillColor: css('--me') });
+    if (nav && nav.line) nav.line.setStyle({ color: css('--me') });
   }
   function toggleTheme() { applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); }
 
@@ -623,6 +686,10 @@
     zonesLayer = L.layerGroup().addTo(map);
     heatmapLayer = L.layerGroup();
     relocationLayer = L.layerGroup().addTo(map);
+    navLayer = L.layerGroup().addTo(map);
+    meLayer = L.layerGroup().addTo(map);
+    map.on('dragstart', () => { followMe = false; });
+    map.on('move zoom resize', () => placeMeChip());
   }
 
   function renderZones() {
@@ -764,7 +831,7 @@
     document.body.classList.add('detail-open');
     renderAlertMarkers();
 
-    document.getElementById('btnNavMaps').href = `https://www.google.com/maps/dir/?api=1&destination=${alert.lat},${alert.lon}`;
+    if (nav && nav.id !== alert.alert_id) stopNav();
     // Fetch or mock Relocation Suggestion (F1 feature from Naz / Tanya)
     let relocation = MOCK_RELOCATIONS[alert.alert_id];
     try {
@@ -848,6 +915,7 @@
   }
 
   function closeDetail() {
+    stopNav();
     activeAlert = null;
     lastRelocation = null;
     relocationLayer.clearLayers();
@@ -1027,7 +1095,7 @@
   function setSheet(kind, down) {
     if (kind === 'list') document.body.classList.toggle('sheet-down', down);
     else document.getElementById('detailSheet').classList.toggle('down', down);
-    setTimeout(() => map.invalidateSize(), 280);
+    setTimeout(() => { map.invalidateSize(); placeMeChip(); }, 280);
   }
   document.querySelectorAll('.sheet-handle').forEach(h => {
     let y0 = null, dragged = false;
@@ -1075,8 +1143,158 @@
     }
   }
 
+  // [A.E.R.O. field] live location: a you-are-here dot that follows the phone, plus in-app guidance
+  // (no Google Maps): a straight walking line, distance and an arrow that turns with the phone, from you to the
+  // turtle, then from the turtle to its release point. Location needs HTTPS (the tunnel) or localhost.
+  let navLayer, meLayer, meMarker = null, meAcc = null, me = null, heading = null, geoWatch = null, geoState = 'off', followMe = false, nav = null, wake = null, compassOn = false, navPushedList = false;
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const R_EARTH = 6371000, rad = d => d * Math.PI / 180;
+  const distM = (a, b) => { const dl = rad(b.lat - a.lat), dn = rad(b.lon - a.lon), h = Math.sin(dl / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dn / 2) ** 2; return 2 * R_EARTH * Math.asin(Math.sqrt(h)); };
+  const bearingTo = (a, b) => { const y = Math.sin(rad(b.lon - a.lon)) * Math.cos(rad(b.lat)), x = Math.cos(rad(a.lat)) * Math.sin(rad(b.lat)) - Math.sin(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.cos(rad(b.lon - a.lon)); return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360; };
+  const fmtDist = m => m < 1000 ? `${Math.round(m)} M<small>${Math.round(m / 0.3048)} FT</small>` : `${(m / 1000).toFixed(1)} KM<small>${(m / 1609.34).toFixed(1)} MI</small>`;
+
+  function setGeo(state) {
+    geoState = state;
+    const msg = {
+      denied: isIOS ? 'Location is blocked. Turn it on: Settings › Privacy & Security › Location Services › Safari Websites › While Using, then Retry.'
+                    : 'Location is blocked. Allow location for this site (the icon at the left of the address bar), then Retry.',
+      insecure: 'Location needs the secure link. Open A.E.R.O. through the https tunnel address, not http.',
+      unsupported: 'This browser can\'t share location. Use Safari or Chrome on the phone.',
+      lost: 'Searching for GPS. Step into the open if you\'re under cover.',
+      asking: 'Allow location so A.E.R.O. can show where you are and guide you to the turtle.',
+    }[state];
+    document.getElementById('locBar').classList.toggle('on', !!msg); document.body.classList.toggle('geo-warn', !!msg);
+    document.getElementById('locText').textContent = msg || '';
+    document.getElementById('locRetry').style.display = state === 'denied' || state === 'lost' ? '' : 'none';
+    document.getElementById('btnLocate').classList.toggle('active', state === 'on' && followMe);
+  }
+  function startLocation(retry) {
+    if (!('geolocation' in navigator)) return setGeo('unsupported');
+    if (!window.isSecureContext) return setGeo('insecure');
+    if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch);
+    if (geoState !== 'on') setGeo('asking');
+    geoWatch = navigator.geolocation.watchPosition(onPos, e => setGeo(e.code === 1 ? 'denied' : (me ? 'on' : 'lost')), { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+    if (!isIOS) startCompass();   // Android/desktop: no permission prompt for the compass
+  }
+  // if the responder changes the permission in the browser, pick it up without a reload
+  try { navigator.permissions && navigator.permissions.query({ name: 'geolocation' }).then(p => { p.onchange = () => { if (p.state === 'granted') startLocation(); else if (p.state === 'denied') setGeo('denied'); }; }); } catch (e) {}
+
+  function onPos(p) {
+    const c = p.coords; me = { lat: c.latitude, lon: c.longitude, acc: c.accuracy, gpsHead: c.speed > 0.6 && c.heading != null && !isNaN(c.heading) ? c.heading : null, t: Date.now() };
+    if (geoState !== 'on') setGeo('on');
+    drawMe();
+    if (followMe) map.panTo([me.lat, me.lon], { animate: true });
+    if (nav) updateNav();
+    placeMeChip();
+  }
+  const curHeading = () => heading != null ? heading : me && me.gpsHead;
+  function drawMe() {
+    if (!me || !map) return;
+    const ll = [me.lat, me.lon];
+    if (!meMarker) {
+      meAcc = L.circle(ll, { radius: me.acc, color: css('--me'), weight: 1, opacity: .5, fillColor: css('--me'), fillOpacity: .1, interactive: false }).addTo(meLayer);
+      meMarker = L.marker(ll, { icon: L.divIcon({ className: '', iconSize: [22, 22], iconAnchor: [11, 11], html: '<div class="me"><span class="me-cone"></span><span class="me-pulse"></span><span class="me-dot"></span></div>' }), zIndexOffset: 2000, keyboard: false })
+        .bindTooltip('YOU', { direction: 'top', offset: [0, -10] }).addTo(meLayer);
+    }
+    meMarker.setLatLng(ll); meAcc.setLatLng(ll).setRadius(Math.min(me.acc, 200));
+    const el = meMarker.getElement() && meMarker.getElement().querySelector('.me'), h = curHeading();
+    if (el) { el.classList.toggle('has-head', h != null); if (h != null) el.querySelector('.me-cone').style.transform = `rotate(${h}deg)`; }
+  }
+
+  // when you're off the visible map, a chip on the map edge points toward you with the distance; tap it to jump there
+  function placeMeChip() {
+    const chip = document.getElementById('meChip');
+    if (!me || !map) return chip.classList.remove('on');
+    const mr = map.getContainer().getBoundingClientRect();
+    let bottom = mr.height;   // phone: the bottom sheets cover part of the map
+    ['.sidebar', '#detailSheet.open'].forEach(q => { const el = document.querySelector(q); if (!el || !phoneView()) return; const t = el.getBoundingClientRect().top - mr.top; if (t > 0 && t < bottom) bottom = t; });
+    const box = { x0: 12, y0: 12, x1: mr.width - (phoneView() ? 70 : 12), y1: bottom - 12 };
+    const p = map.latLngToContainerPoint([me.lat, me.lon]);
+    if (p.x > box.x0 && p.x < box.x1 && p.y > box.y0 && p.y < box.y1) return chip.classList.remove('on');
+    const cx = (box.x0 + box.x1) / 2, cy = (box.y0 + box.y1) / 2, mid = map.containerPointToLatLng([cx, cy]);
+    chip.querySelector('span').textContent = 'You · ' + fmtDist(distM({ lat: mid.lat, lon: mid.lng }, me)).replace(/<small>.*$/, '');
+    chip.classList.add('on');
+    const hw = chip.offsetWidth / 2 + 4, hh = chip.offsetHeight / 2 + 4, dx = p.x - cx, dy = p.y - cy;
+    const k = Math.min(dx ? (dx > 0 ? box.x1 - hw - cx : box.x0 + hw - cx) / dx : Infinity, dy ? (dy > 0 ? box.y1 - hh - cy : box.y0 + hh - cy) / dy : Infinity);
+    chip.style.left = (cx + dx * k) + 'px'; chip.style.top = (cy + dy * k) + 'px';
+    chip.querySelector('svg').style.transform = `rotate(${Math.atan2(dx, -dy) * 180 / Math.PI}deg)`;
+  }
+
+  // phone compass; iPhone asks for permission and only from a tap, so this also runs on My location / Navigate
+  function startCompass() {
+    if (compassOn || !window.DeviceOrientationEvent) return;
+    const attach = () => { compassOn = true; addEventListener('deviceorientationabsolute', onOri, true); addEventListener('deviceorientation', onOri, true); };
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') DeviceOrientationEvent.requestPermission().then(r => { if (r === 'granted') attach(); }).catch(() => {});
+    else attach();
+  }
+  let oriQueued = false;
+  function onOri(e) {
+    let h = e.webkitCompassHeading != null ? e.webkitCompassHeading : (e.absolute && e.alpha != null ? 360 - e.alpha : null);
+    if (h == null) return;
+    h = (h + ((screen.orientation && screen.orientation.angle) || window.orientation || 0) + 360) % 360;
+    heading = h;
+    if (!oriQueued) { oriQueued = true; requestAnimationFrame(() => { oriQueued = false; drawMe(); if (nav) updateNav(true); }); }
+  }
+
+  function locateMe() {
+    startCompass();
+    if (geoState !== 'on') { startLocation(true); followMe = true; return; }
+    followMe = true; setGeo('on');
+    map.setView([me.lat, me.lon], Math.max(map.getZoom(), 19));
+  }
+
+  // ---- guidance: 'turtle' = you -> the flagged spot; 'release' = the turtle's spot -> Tanya's release point ----
+  function startNav(kind) {
+    if (!activeAlert) return;
+    const a = activeAlert, rel = lastRelocation;
+    if (kind === 'release' && !rel) return;
+    startCompass();
+    if (geoState !== 'on') startLocation(true);
+    nav = { id: a.alert_id, kind, arrived: false, num: alertNum(a), name: alertName(a),
+            lat: kind === 'release' ? rel.target_lat : a.lat, lon: kind === 'release' ? rel.target_lon : a.lon };
+    document.body.classList.add('nav-on');
+    if (phoneView()) { setSheet('detail', true); if (!isSheetDown('list')) { setSheet('list', true); navPushedList = true; } }   // phone: both sheets slide down so the map shows
+    navLayer.clearLayers();
+    nav.line = L.polyline([], { color: css('--me'), weight: 3, dashArray: '2, 8', lineCap: 'round', opacity: .95, interactive: false }).addTo(navLayer);
+    if (kind === 'turtle') L.marker([nav.lat, nav.lon], { icon: L.divIcon({ className: '', iconSize: [34, 34], iconAnchor: [17, 17], html: '<div class="nav-target"></div>' }), interactive: false, zIndexOffset: -10 }).addTo(navLayer);
+    try { navigator.wakeLock && navigator.wakeLock.request('screen').then(w => { wake = w; }).catch(() => {}); } catch (e) {}
+    followMe = true;
+    if (me) map.fitBounds(L.latLngBounds([[me.lat, me.lon], [nav.lat, nav.lon]]).pad(0.3), { maxZoom: 20 });
+    updateNav();
+  }
+  function stopNav() {
+    if (!nav) return;
+    nav = null; navLayer.clearLayers(); document.body.classList.remove('nav-on');
+    if (navPushedList) { setSheet('list', false); navPushedList = false; }
+    try { wake && wake.release(); } catch (e) {} wake = null;
+  }
+  function updateNav(headingOnly) {
+    if (!nav) return;
+    const hud = document.getElementById('navHud'), next = document.getElementById('navNext');
+    document.getElementById('navTo').textContent = nav.kind === 'turtle' ? `To turtle · (${nav.num}) ${nav.name}` : `To release point · (${nav.num})`;
+    if (!me) { document.getElementById('navDist').textContent = '--'; document.getElementById('navSub').textContent = geoState === 'denied' ? 'Location is blocked' : 'Waiting for GPS'; return; }
+    const d = distM(me, nav), brg = bearingTo(me, nav), h = curHeading();
+    document.getElementById('navArrow').style.transform = `rotate(${h != null ? brg - h : brg}deg)`;
+    if (headingOnly) return;
+    nav.line.setLatLngs([[me.lat, me.lon], [nav.lat, nav.lon]]);
+    // arrived: inside GPS error (4-12 m); leave a few meters of slack so it doesn't flicker at the edge
+    const near = Math.max(4, Math.min(me.acc, 12));
+    if (!nav.arrived && d <= near) { nav.arrived = true; try { navigator.vibrate && navigator.vibrate([120, 60, 120]); } catch (e) {} }
+    else if (nav.arrived && d > near + 6) nav.arrived = false;
+    hud.classList.toggle('arrived', nav.arrived);
+    document.getElementById('navDist').innerHTML = nav.arrived ? (nav.kind === 'turtle' ? 'At the spot' : 'Release here') : fmtDist(d);
+    document.getElementById('navSub').textContent = nav.arrived
+      ? (nav.kind === 'turtle' ? 'Search within a few meters · GPS ±' + Math.round(me.acc) + ' m' : 'Set it down facing cover, let it walk off')
+      : d > 1000 ? `Off site · ${compass(brg)} of you · get to Grayson Overlook first`   // walking guidance only makes sense on site
+      : `Walk ${compass(brg)} · ${String(Math.round(brg)).padStart(3, '0')}° · ~${Math.max(1, Math.round(d / 1.2 / 60))} min${h == null ? ' · north up' : ''}${me.acc > 15 ? ' · GPS ±' + Math.round(me.acc) + ' m' : ''}`;
+    const showNext = nav.arrived && (nav.kind === 'release' || lastRelocation);
+    next.classList.toggle('on', !!showNext);
+    next.textContent = nav.kind === 'turtle' ? 'Got it · guide me to release point' : 'Mark relocated';
+    next.onclick = nav.kind === 'turtle' ? () => startNav('release') : () => { stopNav(); updateAlertStatus('relocated'); };
+  }
+
   // [A.E.R.O. UI] loading screen (canvas artboard 07) tracks the real loading; ENTER appears once everything is in
-  const loader = window.AeroLoading ? AeroLoading.show({ site: 'Grayson Overlook', onClose: () => map && map.invalidateSize() })
+  const loader = window.AeroLoading ? AeroLoading.show({ site: 'Grayson Overlook', onClose: () => { map && map.invalidateSize(); startLocation(); } })
                                     : { step() {}, ready() {} };
   initMap();
   (async function boot() {
