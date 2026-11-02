@@ -187,3 +187,16 @@ def test_screen_state_reaches_claude_and_no_false_log_check(tmp_path):
     s = store(tmp_path); c = FakeClaude([say("Spot 2 was already marked a false alarm. The fence band is off.")])
     r = respond(s, "is the fence band on?", None, client=c, screen={"fence_band": "off", "my_location": "38.79, -77.64"})
     assert "fence band: off" in c.seen[0]["messages"][-1]["content"] and len(c.seen) == 1 and "already marked" in r["reply"]
+
+
+def test_patch_saves_field_log(tmp_path):
+    """The app's field log (species, sex, health-assessment record) is saved, returned and kept across a restart."""
+    from fastapi.testclient import TestClient
+    from turtles.backend.assistant import create_app, AlertStore, ROOT
+    store = AlertStore.from_alerts(ROOT / "architecture" / "mock" / "alerts.json").load_state(tmp_path / "s.json")
+    c = TestClient(create_app(store, mock_zones=True)); aid = store.list()[0]["alert_id"]
+    rec = {"species": "Eastern box turtle", "sex": "Male", "scl_mm": 142, "exam": {"carapace": "ABN"}, "disposition": "Relocated off site"}
+    a = c.patch(f"/alerts/{aid}", json={"status": "relocated", "species": "Eastern box turtle", "sex": "Male", "record": rec, "user": "Naz"}).json()
+    assert a["species"] == "Eastern box turtle" and a["sex"] == "Male" and a["record"]["scl_mm"] == 142
+    s2 = AlertStore.from_alerts(ROOT / "architecture" / "mock" / "alerts.json").load_state(tmp_path / "s.json")
+    assert s2.get(aid)["record"]["exam"]["carapace"] == "ABN"

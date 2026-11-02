@@ -3,10 +3,12 @@
  *   L.step(i, label)   // 0 site, 1 habitat map, 2 alerts, 3 voice: marks step i done and shows the label
  *   L.ready()          // all loaded: shows ENTER (the morph keeps looping until the responder presses it)
  *   L.close()          // remove it (ENTER calls this); also Esc / Enter key
- * Skips itself with ?skip in the URL. Reduced motion: one still frame, no glitch, no loop. */
+ * The title and top line re-glitch every 12 s; ENTER plays a glitch/power-down into the dashboard, which glitches in
+ * (body.aero-boot, styled in index.html). Skips itself with ?skip in the URL. Reduced motion: one still frame, no glitch, no loop. */
 (function () {
   const css = `
-#aero-load{position:fixed;inset:0;z-index:20000;background:#0A140D;color:#E6EDE7;font-family:'Oxanium',sans-serif;overflow:hidden;transition:opacity .45s ease}
+html.al-on,html.al-on body{background:#0A140D!important}
+#aero-load{position:fixed;top:0;left:0;right:0;height:100vh;height:100lvh;z-index:20000;background:#0A140D;color:#E6EDE7;font-family:'Oxanium',sans-serif;overflow:hidden;transition:opacity .45s ease}
 #aero-load.out{opacity:0;pointer-events:none}
 #aero-load canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #aero-load .al-top{position:absolute;left:clamp(16px,3vw,40px);right:clamp(16px,3vw,40px);top:max(20px,env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -14,7 +16,7 @@
 #aero-load .mono{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.2em;text-transform:uppercase}
 #aero-load .al-sub{color:#9FB3A5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #aero-load .al-form{color:#4ADE80;white-space:nowrap}
-#aero-load .al-bot{position:absolute;left:16px;right:16px;bottom:max(36px,calc(env(safe-area-inset-bottom) + 20px));display:flex;flex-direction:column;align-items:center;gap:16px}
+#aero-load .al-bot{position:absolute;left:16px;right:16px;bottom:max(36px,calc(env(safe-area-inset-bottom) + 20px));bottom:calc(100lvh - 100dvh + max(36px,calc(env(safe-area-inset-bottom) + 20px)));display:flex;flex-direction:column;align-items:center;gap:16px}
 #aero-load .title{position:relative;font-size:clamp(46px,7vw,66px);font-weight:300;letter-spacing:.04em;line-height:1}
 #aero-load .al-status{width:min(420px,100%);display:flex;flex-direction:column;gap:10px}
 #aero-load .al-row{display:flex;justify-content:space-between;gap:12px;font-size:11.5px;letter-spacing:.14em}
@@ -33,18 +35,35 @@
 #aero-load.run .title::after{color:#86EFAC;animation:alB .95s steps(1,end) 1.5s both}
 @keyframes alA{0%{opacity:.85;transform:translate(-6px,1px);clip-path:inset(0 0 62% 0)}20%{transform:translate(5px,-1px);clip-path:inset(55% 0 12% 0)}40%{transform:translate(-4px,0);clip-path:inset(18% 0 52% 0)}60%{opacity:.6;transform:translate(3px,0);clip-path:inset(72% 0 0 0)}80%{opacity:.4;transform:translate(-2px,0);clip-path:inset(35% 0 40% 0)}100%{opacity:0;transform:none}}
 @keyframes alB{0%{opacity:.7;transform:translate(6px,-1px);clip-path:inset(60% 0 8% 0)}20%{transform:translate(-5px,1px);clip-path:inset(5% 0 70% 0)}40%{transform:translate(4px,0);clip-path:inset(48% 0 22% 0)}60%{opacity:.5;transform:translate(-3px,0);clip-path:inset(0 0 75% 0)}80%{opacity:.3;transform:translate(2px,0);clip-path:inset(62% 0 15% 0)}100%{opacity:0;transform:none}}
+#aero-load.settled .g{opacity:1;animation:none}
+#aero-load .rg{animation:alRe .6s steps(1,end) both!important}
+#aero-load .title.rg::before{animation:alA .6s steps(1,end) both}#aero-load .title.rg::after{animation:alB .6s steps(1,end) both}
+@keyframes alRe{0%{transform:translateX(-8px);clip-path:inset(40% 0 42% 0)}14%{transform:translateX(6px) skewX(-10deg);clip-path:inset(6% 0 70% 0)}28%{opacity:.4;transform:translateX(-4px);clip-path:inset(60% 0 8% 0)}42%{opacity:1;transform:translateX(3px);clip-path:none}56%{transform:translateX(-2px) skewX(6deg);clip-path:inset(30% 0 34% 0)}70%,100%{transform:none;clip-path:none}}
+#aero-load .al-scan{position:absolute;inset:0;pointer-events:none;opacity:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.35) 0 1px,transparent 1px 3px)}
+#aero-load .al-flash{position:absolute;inset:0;pointer-events:none;opacity:0;background:#DCFCE7;mix-blend-mode:overlay}
+#aero-load.exit .al-scan{animation:alScan .12s steps(2,end) infinite}
+#aero-load.exit .al-flash{animation:alFlash .7s steps(1,end) both}
+#aero-load.exit .title,#aero-load.exit .al-brand,#aero-load.exit .al-form,#aero-load.exit .al-enter{animation:alRe .32s steps(1,end) infinite!important;opacity:1}
+#aero-load.exit .title::before{animation:alA .32s steps(1,end) infinite}#aero-load.exit .title::after{animation:alB .32s steps(1,end) infinite}
+#aero-load.exit .al-enter{background:#04140A;color:#4ADE80}
+#aero-load.exit .al-label{color:#4ADE80!important}
+#aero-load.off{animation:alOff .5s cubic-bezier(.7,0,.9,.4) both;transition:none}
+@keyframes alScan{0%{opacity:.9}50%{opacity:.5}}
+@keyframes alFlash{0%{opacity:.5}6%{opacity:0}30%{opacity:.35}34%{opacity:0}62%{opacity:.25}66%,100%{opacity:0}}
+@keyframes alOff{0%{transform:none;filter:none}45%{transform:scale(1,.006);filter:brightness(4) saturate(.4)}75%{transform:scale(.6,.004);filter:brightness(5);opacity:1}100%{transform:scale(0,.002);filter:brightness(6);opacity:0}}
 @media (max-width:600px){#aero-load .al-sub{display:none}}
-@media (prefers-reduced-motion: reduce){#aero-load .g,#aero-load .al-enter.on{animation:none!important;opacity:1}#aero-load.run .title::before,#aero-load.run .title::after{animation:none}#aero-load .al-fill{transition:none}}`;
-  const SHIELD = '<svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="alG" x1="0.2" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#4ADE80"/><stop offset="0.55" stop-color="#16A34A"/><stop offset="1" stop-color="#052E16"/></linearGradient></defs><path fill="url(#alG)" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><polygon fill="#DCFCE7" stroke="#052E16" stroke-width="1.6" stroke-linejoin="round" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>';
+@media (prefers-reduced-motion: reduce){#aero-load .g,#aero-load .al-enter.on{animation:none!important;opacity:1}#aero-load.run .title::before,#aero-load.run .title::after,#aero-load .rg::before,#aero-load .rg::after{animation:none}#aero-load .rg{animation:none!important}#aero-load .al-fill{transition:none}}`;
+  // the main A.E.R.O. mark (artboard 04): gradient shield cut into box-turtle scutes around a pale hexagon
+  const SHIELD = '<svg width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="alG" x1="0.2" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#4ADE80"/><stop offset="0.55" stop-color="#16A34A"/><stop offset="1" stop-color="#052E16"/></linearGradient></defs><path fill="url(#alG)" stroke="#4ADE80" stroke-opacity=".45" stroke-width="1" stroke-linejoin="round" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><path fill="none" stroke="#052E16" stroke-opacity=".7" stroke-width="1.6" stroke-linecap="round" d="M32 19V4M41.5 24.5L55.5 17M41.5 35.5L53.4 42.4M32 41V60.3M22.5 24.5L8.5 17M22.5 35.5L10.6 42.4"/><polygon fill="#DCFCE7" stroke="#052E16" stroke-width="1.6" stroke-linejoin="round" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>';
 
   class Engine {
     constructor(cv) {
       this.cv = cv;
       this.names = { turtle: 'FORM 01 · TURTLE', shield: 'FORM 02 · SHIELD', drone: 'FORM 03 · DRONE' };
       this.cycle = [['hold', 'turtle', 'turtle', 10], ['morph', 'turtle', 'shield', 1.8], ['hold', 'shield', 'shield', 6], ['morph', 'shield', 'drone', 1.8], ['hold', 'drone', 'drone', 7], ['morph', 'drone', 'turtle', 1.8]];
-      this.resize();
+      this.boost = 0; this.resize();
     }
-    resize() { this.W = innerWidth; this.H = innerHeight; this.build(); }
+    resize() { this.W = this.cv.clientWidth || innerWidth; this.H = this.cv.clientHeight || innerHeight; this.build(); }
   mk() {
     const V = [], E = [], P = [{ kind: 'body' }]; let part = 0;
     const v = (x, y, z, c, w) => { V.push({ x, y, z, c, w: w ?? 1, part }); return V.length - 1; };
@@ -123,7 +142,7 @@
     mesh(0, 0, 0, 52, 18, 36, 4, 14, false, 'body');
     mesh(38, -18, 0, 9, 9, 9, 3, 6, false, 'cam');
     [[95, 95, 1], [95, -95, -1], [-95, 95, -1], [-95, -95, 1]].forEach(([mx, mz, dir]) => {
-      bodyPart();
+      setPart({ kind: 'arm' });
       const ax = Math.sign(mx) * 28, az = Math.sign(mz) * 20, a = [], b = [];
       for (let i = 0; i <= 6; i++) { const f = i / 6, x = ax + (mx - ax) * f, z = az + (mz - az) * f; a.push(v(x, 0, z, 'arm')); b.push(v(x, 5, z, 'arm')); }
       a.forEach((k, i) => { e(k, b[i]); if (i) { e(a[i - 1], k); e(b[i - 1], b[i]); } });
@@ -207,7 +226,8 @@
       c.globalAlpha = 0.22 * on; c.beginPath();
       for (let k = 0; k < 72; k++) { const a = k * TAU / 72, l = k % 9 === 0 ? 14 : 6; c.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); c.lineTo(cx + Math.cos(a) * (R - l), cy + Math.sin(a) * (R - l)); }
       c.stroke();
-      const sweep = (-Math.PI / 2 + t * TAU / 4.5) % TAU, prev = this.prevSweep ?? sweep;
+      this.sw = (this.sw ?? -Math.PI / 2) + (this.lastT == null ? 0 : (t - this.lastT) * TAU / 4.5 * (1 + 5 * this.boost)); this.lastT = t;
+      const sweep = this.sw % TAU, prev = this.prevSweep ?? sweep;
       for (let k = 0; k < 30; k++) { c.globalAlpha = 0.16 * on * (1 - k / 30); c.fillStyle = '#16A34A'; c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, R, sweep - (k + 1) * 0.026, sweep - k * 0.026); c.closePath(); c.fill(); }
       c.globalAlpha = 0.75 * on; c.strokeStyle = '#4ADE80'; c.lineWidth = 1.6;
       c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(sweep) * R, cy + Math.sin(sweep) * R); c.stroke();
@@ -251,6 +271,20 @@
         c.strokeStyle = pa.col; c.beginPath(); c.moveTo(pa.x, pa.y); c.lineTo(pb.x, pb.y); c.stroke();
       }
     };
+    // the radar sits behind the model: each part's silhouette (convex hull) is filled with the ground color first
+    const occ = ph.kind === 'intro' ? Math.min(1, Math.max(0, (t - 1.1) / 0.5)) : morph ? Math.max(0, 1 - Math.sin(Math.PI * ph.f) * 2.4) : 1;
+    if (occ > 0.01) {
+      const useB = !morph || ph.f >= 0.5, sh = this.shapes[useB ? ph.to : ph.from].V, n = sh.length, groups = {};
+      P.forEach((p, i) => { const v = sh[i % n]; if (v.w < 0.6) return; (groups[v.part] = groups[v.part] || []).push(p); });
+      c.globalAlpha = 0.9 * occ; c.fillStyle = '#0A140D';
+      for (const g in groups) {
+        const pts = groups[g].map(p => [p.x, p.y]).sort((a, b) => a[0] - b[0] || a[1] - b[1]); if (pts.length < 3) continue;
+        const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
+        for (const q of pts) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+        for (const q of pts.reverse()) { while (up.length > 1 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+        const hull = lo.slice(0, -1).concat(up.slice(0, -1)); c.beginPath(); hull.forEach(([x, y], k) => k ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fill();
+      }
+    }
     c.lineWidth = 1;
     if (A) edges(this.shapes[ph.from].E, (a, b) => (1 - Math.max(a.e, b.e)) ** 2);
     edges(this.shapes[ph.to].E, (a, b) => Math.min(a.e, b.e) ** 2);
@@ -260,19 +294,41 @@
       c.fillStyle = p.eye ? '#DCFCE7' : p.col; c.fillRect(p.x - z / 2, p.y - z / 2, z, z);
     }
     c.globalAlpha = 1;
+    // glitch: horizontal slices of the frame jump sideways (the 12 s re-glitch and the ENTER transition)
+    const gl = Math.max(this.boost, now < (this.glUntil || 0) ? 0.5 : 0);
+    if (gl > 0) for (let k = 0, n = Math.ceil(gl * 9); k < n; k++) {
+      if (Math.random() > 0.35 + gl * 0.6) continue;
+      const y = Math.random() * H, h = 3 + Math.random() * 38 * gl, dx = (Math.random() - 0.5) * 120 * gl;
+      c.drawImage(cv, 0, y * dpr, W * dpr, h * dpr, dx, y, W, h);
+      if (Math.random() < 0.4) { c.globalAlpha = 0.18 * gl; c.fillStyle = '#4ADE80'; c.fillRect(0, y, W, Math.max(1, h * 0.15)); c.globalAlpha = 1; }
+    }
     const form = morph ? this.names[ph.from].slice(10) + ' → ' + this.names[ph.to].slice(10) : this.names[ph.to];
     if (form !== this.form) { this.form = form; this.onForm && this.onForm(form); }
   }
   }
 
-  let eng = null, root = null, raf = 0, done = 0, isReady = false, closed = false, onClose = null;
+  let eng = null, root = null, raf = 0, done = 0, isReady = false, closed = false, onClose = null, regl = 0, settle = 0, log = [];
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const $ = s => root.querySelector(s);
   function loop(now) { eng.draw(now); raf = requestAnimationFrame(loop); }
   function close() {
     if (!root || closed) return; closed = true;
-    root.classList.add('out'); removeEventListener('keydown', onKey); removeEventListener('resize', onResize);
-    setTimeout(() => { cancelAnimationFrame(raf); root.remove(); onClose && onClose(); }, 470);
+    clearInterval(regl); clearTimeout(settle); removeEventListener('keydown', onKey); removeEventListener('resize', onResize);
+    const finish = () => { cancelAnimationFrame(raf); root.remove(); document.documentElement.classList.remove('al-on'); onClose && onClose(); };
+    if (still) { root.classList.add('out'); setTimeout(finish, 470); return; }
+    // ENTER: the screen glitches hard while a boot log runs, then powers down like a CRT and the dashboard glitches in behind it
+    root.classList.add('settled', 'exit'); $('.al-enter').disabled = true;
+    const lab = $('.al-label'), t0 = performance.now();
+    (log.length ? log : ['LINK · OK']).concat(['ACCESS GRANTED']).forEach((l, i) => setTimeout(() => { lab.textContent = '> ' + l; }, i * 120));
+    const ramp = () => { if (!root.isConnected) return; eng.boost = Math.min(1, (performance.now() - t0) / 700); if (eng.boost < 1) requestAnimationFrame(ramp); };
+    ramp();
+    setTimeout(() => { root.classList.add('off'); document.body.classList.add('aero-boot'); setTimeout(() => document.body.classList.remove('aero-boot'), 2200); }, 780);
+    setTimeout(finish, 1280);
+  }
+  function reglitch() {
+    if (closed || document.hidden) return;
+    ['.al-brand', '.al-form', '.title'].forEach(q => { const el = $(q); el.classList.remove('rg'); void el.offsetWidth; el.classList.add('rg'); setTimeout(() => el.classList.remove('rg'), 650); });
+    eng.glUntil = performance.now() + 420;
   }
   function onKey(e) { if (isReady && (e.key === 'Enter' || e.key === 'Escape')) { e.preventDefault(); close(); } }
   function onResize() { if (!eng) return; const t0 = eng.t0; eng.resize(); eng.t0 = t0; if (still) eng.draw(eng.t0 + 3000); }
@@ -285,21 +341,21 @@
       onClose = opts.onClose;
       const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
       root = document.createElement('div'); root.id = 'aero-load'; root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', 'A.E.R.O. is loading');
-      root.innerHTML = `<canvas aria-hidden="true"></canvas>
+      root.innerHTML = `<canvas aria-hidden="true"></canvas><div class="al-scan"></div><div class="al-flash"></div>
         <div class="al-top"><div class="al-brand g d1">${SHIELD}<span class="mono al-sub">What About the Turtles · Field system</span></div><span class="mono al-form g d3" aria-hidden="true"></span></div>
         <div class="al-bot"><span class="title g d4" data-text="A.E.R.O.">A.E.R.O.</span>
           <div class="al-status g d5"><div class="al-row mono"><span class="al-label" style="color:#9FB3A5" aria-live="polite">LOADING SITE · ${(opts.site || 'Grayson Overlook').toUpperCase()}</span><span class="al-pct" style="color:#4ADE80">0%</span></div><div class="al-bar"><div class="al-fill"></div></div></div>
           <button class="al-enter" type="button">ENTER</button></div>`;
-      document.body.appendChild(root);
+      document.body.appendChild(root); document.documentElement.classList.add('al-on');
       eng = new Engine($('canvas')); eng.onForm = f => { $('.al-form').textContent = f; };
       eng.t0 = performance.now();
-      if (still) eng.draw(eng.t0 + 3000); else { root.classList.add('run'); raf = requestAnimationFrame(loop); }
+      if (still) eng.draw(eng.t0 + 3000); else { root.classList.add('run'); raf = requestAnimationFrame(loop); settle = setTimeout(() => root.classList.add('settled'), 3000); regl = setInterval(reglitch, 12000); }
       $('.al-enter').onclick = close;
       addEventListener('keydown', onKey); addEventListener('resize', onResize);
       const shownAt = performance.now(), minMs = still ? 0 : (opts.minMs ?? 2800);
       return Object.assign(api, {
         skipped: false,
-        step(i, label) { done = Math.max(done, Math.min(4, i + 1)); if (label) $('.al-label').textContent = label; setPct(); return api; },
+        step(i, label) { done = Math.max(done, Math.min(4, i + 1)); if (label) { $('.al-label').textContent = label; log.push(label + (/CONNECTING$/.test(label) ? '' : ' · OK')); } setPct(); return api; },
         ready() {
           if (isReady) return api;
           setTimeout(() => { isReady = true; done = 4; setPct(); $('.al-label').textContent = 'READY'; const b = $('.al-enter'); b.classList.add('on'); b.focus({ preventScroll: true }); },

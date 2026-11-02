@@ -12,7 +12,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="A.E.R.O.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%2316A34A' d='M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z'/%3E%3Cpolygon fill='%23DCFCE7' points='32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0.2' y1='0' x2='0.6' y2='1'%3E%3Cstop offset='0' stop-color='%234ADE80'/%3E%3Cstop offset='0.55' stop-color='%2316A34A'/%3E%3Cstop offset='1' stop-color='%23052E16'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z'/%3E%3Cpath fill='none' stroke='%23052E16' stroke-opacity='.7' stroke-width='2' d='M32 19V4M41.5 24.5L55.5 17M41.5 35.5L53.4 42.4M32 41V60.3M22.5 24.5L8.5 17M22.5 35.5L10.6 42.4'/%3E%3Cpolygon fill='%23DCFCE7' stroke='%23052E16' stroke-width='1.6' points='32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5'/%3E%3C/svg%3E">
   <!-- [A.E.R.O. UI] pick the theme before first paint: saved choice, else dark on a laptop and light (field mode) on a phone -->
   <script>
     (function () { let t = null; try { t = localStorage.getItem('aero-theme'); } catch (e) {}
@@ -39,7 +39,7 @@
     :root, :root[data-theme="dark"] {
       --bg: #0A140D; --panel: #0F1D14; --panel-2: #050B07; --line: #1C2E21; --line-strong: #2B4433;
       --ink: #E6EDE7; --muted: #9FB3A5; --accent: #4ADE80; --accent-text: #4ADE80; --accent-soft: rgba(74,222,128,.10);
-      --high: #F87171; --review: #FBBF24; --reloc: #4ADE80; --false: #6B7C70; --on-pin: #0A140D;
+      --high: #F87171; --review: #FBBF24; --reloc: #4ADE80; --false: #6B7C70; --on-pin: #0A140D; --me: #38BDF8;
       --shadow: 0 10px 28px rgba(0,0,0,.45); --map-bg: #0C1910;
       --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-mono: 'JetBrains Mono', ui-monospace, monospace;
@@ -49,7 +49,7 @@
     :root[data-theme="light"] {
       --bg: #EEF3EF; --panel: #FFFFFF; --panel-2: #F6F9F6; --line: #CFDCD2; --line-strong: #B5C7B9;
       --ink: #052E16; --muted: #4B5F52; --accent: #16A34A; --accent-text: #14532D; --accent-soft: rgba(22,163,74,.10);
-      --high: #B91C1C; --review: #B45309; --reloc: #15803D; --false: #6B7280; --on-pin: #FFFFFF;
+      --high: #B91C1C; --review: #B45309; --reloc: #15803D; --false: #6B7280; --on-pin: #FFFFFF; --me: #0284C7;
       --shadow: 0 8px 22px rgba(5,46,22,.10); --map-bg: #E4EBE3;
       color-scheme: light;
     }
@@ -127,6 +127,8 @@
     .map-legend > span { display: inline-flex; align-items: center; gap: 7px; }
     .lg-pin { width: 12px; height: 14px; } .lg-pin path { fill: var(--c); stroke: var(--c); stroke-width: 6; } .lg-pin.false path { fill: transparent; }
     .lg-sw { width: 16px; height: 8px; }
+    .lg-dia { width: 8px; height: 8px; margin: 0 2px; background: var(--high); transform: rotate(45deg); border-radius: 1px; }
+    .pin-confirmed::after { content: ''; position: absolute; right: -3px; top: -3px; width: 9px; height: 9px; background: var(--c); border: 2px solid var(--on-pin); border-radius: 2px; transform: rotate(45deg); }
     .lg-sep { width: 1px; height: 14px; background: var(--line); }
 
     /* Sidebar */
@@ -214,10 +216,11 @@
     .triage-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
     .btn-triage { --c: var(--muted); min-height: 56px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); background: var(--panel); color: var(--c); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
     .btn-triage:hover { background: color-mix(in srgb, var(--c) 10%, var(--panel)); }
-    .btn-relocated { --c: var(--reloc); } .btn-confirmed { --c: var(--review); } .btn-fp { --c: var(--false); }
+    .btn-relocated { --c: var(--reloc); } .btn-confirmed { --c: var(--high); } .btn-fp { --c: var(--false); }
 
     /* A.E.R.O. voice button: sits on the map, left of the zoom buttons */
-    html body #ht-dock { right: 484px; bottom: 20px; }
+    html body #ht-dock { right: 484px; bottom: 20px; flex-direction: column; align-items: flex-end; gap: 8px; }   /* CHAT sits above TAP TO TALK, clear of the legend */
+    .map-legend { max-width: calc(100% - 484px - 270px); }   /* the legend wraps before it reaches the voice button */
 
     /* sheet handles (phone): tap or drag down to see the whole map, tap or drag up to bring the sheet back */
     .sheet-handle { display: none; }
@@ -248,10 +251,109 @@
       .detail-header, .detail-body { padding-left: 16px; padding-right: 16px; }
       .detail-name { font-size: 24px; } .relocation-instruction { font-size: 19px; }
       .leaflet-control-zoom { display: none; }
-      html body #ht-dock { right: 14px; bottom: calc(48% + 14px); transition: bottom .25s ease; }
+      html body #ht-dock { right: 14px; bottom: calc(48% + 14px); transition: bottom .25s ease; flex-direction: column-reverse; align-items: center; }
       html body.sheet-down #ht-dock { bottom: calc(92px + env(safe-area-inset-bottom)); }
       html body.detail-open #ht-dock { bottom: auto; top: calc(70px + env(safe-area-inset-top)); right: auto; left: 12px; flex-direction: column; }
     }
+    .btn-nav-gmaps { width: 100%; cursor: pointer; }
+    /* [A.E.R.O. field] you-are-here dot (blue, so it never reads as a turtle status), heading cone, accuracy ring */
+    .me { position: relative; width: 22px; height: 22px; }
+    .me .me-dot { position: absolute; inset: 3px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.45); }
+    .me .me-pulse { position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--me); opacity: 0; animation: mePing 2.2s ease-out infinite; }
+    .me .me-cone { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; display: none; background: conic-gradient(from -28deg, color-mix(in srgb, var(--me) 55%, transparent) 0deg, transparent 56deg, transparent 360deg); border-radius: 50%; -webkit-mask: radial-gradient(circle, #000 30%, transparent 72%); mask: radial-gradient(circle, #000 30%, transparent 72%); }
+    .me.has-head .me-cone { display: block; }
+    .me.stale .me-dot { background: var(--false); }
+    @keyframes mePing { 0% { transform: scale(.6); opacity: .8; } 100% { transform: scale(1.8); opacity: 0; } }
+    .nav-target { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--me); box-shadow: 0 0 0 6px color-mix(in srgb, var(--me) 18%, transparent); animation: mePing 2s ease-out infinite; }
+    #mapTop { position: absolute; z-index: 960; top: 20px; left: calc((100% - 400px) / 2); transform: translateX(-50%); width: min(380px, calc(100% - 520px)); display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    #mapTop > * { pointer-events: auto; }
+    #locBar { display: none; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 6px; background: var(--panel); border: 1px solid var(--review); color: var(--ink); box-shadow: var(--shadow); font-family: var(--font-sans); font-size: 13px; line-height: 1.4; }
+    #locBar.on { display: flex; } #locBar .lb-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--review); flex-shrink: 0; }
+    #locBar span#locText { flex: 1; }
+    #locRetry { flex-shrink: 0; min-height: 36px; padding: 0 12px; border-radius: 4px; border: 1px solid var(--line-strong); background: transparent; color: var(--accent-text); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; cursor: pointer; }
+    #navHud { display: none; flex-direction: column; gap: 10px; padding: 12px; border-radius: 8px; background: var(--panel); border: 1px solid var(--me); box-shadow: var(--shadow); }
+    body.nav-on #navHud { display: flex; }
+    #navHud .nh-row { display: flex; align-items: center; gap: 14px; }
+    .nh-arrow { width: 64px; height: 64px; flex-shrink: 0; transition: transform .25s linear; }
+    .nh-arrow .nh-ring { fill: none; stroke: var(--line-strong); stroke-width: 1.5; } .nh-arrow .nh-tip { fill: var(--me); }
+    #navHud.arrived .nh-arrow .nh-tip { fill: var(--reloc); } #navHud.arrived { border-color: var(--reloc); } #navHud.arrived .nh-dist { font-size: 26px; }
+    .nh-main { flex: 1; min-width: 0; }
+    .nh-to { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nh-dist { font-family: var(--font-display); font-weight: 300; font-size: 34px; line-height: 1.1; color: var(--ink); white-space: nowrap; }
+    .nh-dist small { font-family: var(--font-mono); font-size: 12px; letter-spacing: .1em; color: var(--muted); margin-left: 8px; }
+    .nh-sub { font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); }
+    .nh-stop { width: 44px; height: 44px; flex-shrink: 0; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+    .nh-next { display: none; min-height: 48px; border-radius: 6px; border: 1px solid var(--reloc); background: color-mix(in srgb, var(--reloc) 14%, var(--panel)); color: var(--ink); font-family: var(--font-display); font-weight: 500; font-size: 14px; letter-spacing: .16em; text-transform: uppercase; cursor: pointer; }
+    .nh-next.on { display: block; }
+    #meChip { position: absolute; z-index: 955; display: none; align-items: center; gap: 7px; height: 34px; padding: 0 12px 0 9px; border-radius: 17px; transform: translate(-50%, -50%); border: 1px solid var(--me); background: var(--panel); color: var(--ink); box-shadow: var(--shadow); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
+    #meChip.on { display: inline-flex; }
+    #meChip svg { width: 15px; height: 15px; flex-shrink: 0; fill: var(--me); }
+    @media (max-width: 1100px) { #mapTop { left: 260px; transform: none; width: auto; right: 420px; } }
+    @media (max-width: 768px) { body.detail-open #mapTop { left: 84px; } body.detail-open.nav-on #mapTop { left: 12px; }
+      html body.detail-open.nav-on #ht-dock { top: auto; left: auto; right: 14px; bottom: calc(164px + env(safe-area-inset-bottom)); flex-direction: column-reverse; }
+      #mapTop { top: 12px; left: 12px; right: 68px; width: auto; transform: none; } .nh-arrow { width: 50px; height: 50px; } .nh-dist { font-size: 26px; } .nh-dist small { font-size: 11px; margin-left: 6px; } .nh-sub { font-size: 10px; letter-spacing: .1em; } #navHud { padding: 10px; } #navHud .nh-row { gap: 10px; } }
+    @media (prefers-reduced-motion: reduce) { .me .me-pulse, .nav-target { animation: none; } .nh-arrow { transition: none; } }
+    /* [A.E.R.O. field] responder note sheet: centered on a laptop, at the top on a phone so the keyboard never covers it */
+    #noteModal { position: fixed; inset: 0; z-index: 13000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2, 8, 4, .55); }
+    #noteModal[hidden] { display: none; }
+    .nm-card { --c: var(--accent); width: min(460px, 100%); display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--c); box-shadow: 0 24px 60px rgba(0,0,0,.45); animation: nmIn .18s ease-out; }
+    .nm-head { display: flex; align-items: center; justify-content: space-between; }
+    .nm-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 4px; border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); color: var(--c); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; }
+    .nm-x { width: 40px; height: 40px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+    .nm-title { font-family: var(--font-display); font-weight: 500; font-size: 20px; line-height: 1.25; color: var(--ink); margin-bottom: 4px; }
+    #noteText { width: 100%; min-height: 96px; resize: vertical; padding: 12px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--bg); color: var(--ink); font: 16px/1.45 var(--font-sans); }
+    #noteText:focus { outline: none; border-color: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 20%, transparent); }
+    .nm-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .nm-tags button { min-height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--line-strong); background: transparent; color: var(--muted); font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+    .nm-tags button:hover, .nm-tags button.on { color: var(--ink); border-color: var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); }
+    .nm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; position: sticky; bottom: -18px; padding: 10px 0 18px; margin-bottom: -18px; background: var(--panel); border-top: 1px solid var(--line); }   /* Save stays in reach while the log scrolls */
+    .nm-cancel, .nm-save { min-height: 48px; padding: 0 22px; border-radius: 6px; font-family: var(--font-display); font-weight: 500; font-size: 14px; letter-spacing: .16em; text-transform: uppercase; cursor: pointer; }
+    .nm-cancel { border: 1px solid var(--line); background: transparent; color: var(--muted); }
+    .nm-save { border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 16%, var(--panel)); color: var(--ink); }
+    .nm-card { max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; } .nm-card > * { flex-shrink: 0; }
+    .nm-auto { font-size: 10.5px; letter-spacing: .1em; color: var(--muted); line-height: 1.5; margin-top: -4px; }
+    #fieldLog { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    #fieldLog[hidden] { display: none; }
+    .fl { border-bottom: 1px solid var(--line); } .fl:last-child { border-bottom: none; }
+    .fl summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 46px; padding: 0 14px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+    .fl summary::-webkit-details-marker { display: none; }
+    .fl summary::after { content: '+'; color: var(--muted); font-size: 16px; } .fl[open] summary::after { content: '–'; }
+    .fl-n { flex: 1; text-align: right; color: var(--c); font-size: 10px; letter-spacing: .08em; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fl > :not(summary) { margin: 0 14px 12px; }
+    .fl-q { display: flex; flex-direction: column; gap: 7px; }
+    .fl-hint { font-size: 12px; line-height: 1.4; color: var(--muted); }
+    .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+    .seg button { min-height: 38px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line-strong); background: transparent; color: var(--muted); font: 500 13px var(--font-sans); cursor: pointer; }
+    .seg button.on { color: var(--ink); border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+    .fl-in { width: 100%; min-height: 42px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--bg); color: var(--ink); font: 16px var(--font-sans); }
+    .fl-in:focus, .fl-grid input:focus { outline: none; border-color: var(--c); }
+    .fl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+    .fl-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+    .fl-grid label span { display: flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--bg); padding-right: 10px; }
+    .fl-grid input { flex: 1; min-width: 0; min-height: 42px; padding: 0 10px; border: none; border-radius: 6px; background: transparent; color: var(--ink); font: 16px var(--font-mono); }
+    .fl-grid i { font: normal 11px var(--font-mono); color: var(--muted); }
+    .ex-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px dashed var(--line); font-size: 13px; color: var(--ink); }
+    .ex-row:last-child { border-bottom: none; }
+    .ex-row .seg button { min-height: 34px; min-width: 46px; padding: 0 8px; font: 500 10.5px var(--font-mono); letter-spacing: .08em; }
+    .ex-row .seg button.on[data-v="ABN"] { border-color: var(--high); background: color-mix(in srgb, var(--high) 14%, transparent); }
+    .detail-grid .val.log { font-size: 13px; line-height: 1.5; }
+    @keyframes nmIn { from { opacity: 0; transform: translateY(8px); } }
+    @media (max-width: 768px) { #noteModal { align-items: flex-start; padding: calc(12px + env(safe-area-inset-top)) 10px 10px; } .nm-actions > * { flex: 1; } }
+    @media (prefers-reduced-motion: reduce) { .nm-card { animation: none; } }
+    /* [A.E.R.O. UI] after ENTER the dashboard boots in with a glitch: panels slice in, the map flickers on, a scan line runs down */
+    body.aero-boot header, body.aero-boot .sidebar, body.aero-boot .map-floating-panel, body.aero-boot .map-legend, body.aero-boot #ht-dock, body.aero-boot .leaflet-control-zoom { animation: bootIn .75s steps(1, end) both; }
+    body.aero-boot .sidebar { animation-delay: .12s; } body.aero-boot .map-floating-panel { animation-delay: .26s; } body.aero-boot .map-legend { animation-delay: .38s; }
+    body.aero-boot .leaflet-control-zoom { animation-delay: .46s; } body.aero-boot #ht-dock { animation-delay: .54s; }
+    body.aero-boot .brand h1 { animation: bootRgb .9s steps(1, end) .1s both; }
+    body.aero-boot #map { animation: bootMap .95s steps(1, end) both; }
+    body.aero-boot::before { content: ''; position: fixed; inset: 0; z-index: 15000; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(5,46,22,.28) 0 1px, transparent 1px 3px); animation: bootLines 1.3s ease-out both; }
+    body.aero-boot::after { content: ''; position: fixed; left: 0; right: 0; top: 0; height: 140px; z-index: 15001; pointer-events: none; background: linear-gradient(180deg, transparent, rgba(74,222,128,.10) 70%, rgba(74,222,128,.55) 97%, rgba(220,252,231,.9) 100%); animation: bootScan 1.1s cubic-bezier(.5,0,.6,1) .1s both; }
+    @keyframes bootIn { 0% { opacity: 0; transform: translateX(-12px); clip-path: inset(42% 0 44% 0); } 12% { opacity: 1; transform: translateX(8px) skewX(-8deg); clip-path: inset(8% 0 70% 0); } 24% { opacity: .3; transform: translateX(-6px); clip-path: inset(60% 0 6% 0); } 36% { opacity: 1; transform: translateX(4px); clip-path: inset(0 0 0 0); } 48% { opacity: .6; transform: translateX(-3px) skewX(5deg); clip-path: inset(28% 0 36% 0); } 62% { opacity: 1; transform: translateX(2px); clip-path: inset(0 0 0 0); } 76% { opacity: .85; transform: translateX(-1px); clip-path: inset(70% 0 0 0); } 88%, 100% { opacity: 1; transform: none; clip-path: none; } }
+    @keyframes bootMap { 0% { opacity: 0; } 10% { opacity: .7; filter: brightness(1.9) saturate(.4); clip-path: inset(22% 0 48% 0); transform: translateX(10px); } 20% { opacity: 0; } 32% { opacity: .85; filter: brightness(1.4); clip-path: inset(0 0 58% 0); transform: translateX(-8px); } 46% { opacity: 1; clip-path: inset(38% 0 0 0); transform: translateX(3px); } 60% { clip-path: none; transform: none; filter: brightness(1.25); } 72% { filter: brightness(.8); } 84%, 100% { opacity: 1; filter: none; clip-path: none; transform: none; } }
+    @keyframes bootRgb { 0% { text-shadow: -4px 0 rgba(74,222,128,.9), 4px 0 rgba(134,239,172,.7); } 25% { text-shadow: 3px 0 rgba(74,222,128,.8), -3px 0 rgba(134,239,172,.6); } 50% { text-shadow: -2px 0 rgba(74,222,128,.6), 2px 0 rgba(134,239,172,.4); } 75% { text-shadow: 1px 0 rgba(74,222,128,.4); } 100% { text-shadow: none; } }
+    @keyframes bootLines { 0% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes bootScan { 0% { transform: translateY(-140px); opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(100vh); opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { body.aero-boot *, body.aero-boot::before, body.aero-boot::after { animation: none !important; } body.aero-boot::before, body.aero-boot::after { display: none; } }
     @media (prefers-reduced-motion: reduce) { .live-dot, .pin.high::before, .pin.high::after { animation: none; } }
   </style>
 </head>
@@ -267,6 +369,7 @@
     <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
     <symbol id="i-nav" viewBox="0 0 24 24"><path d="M12 2l7 19-7-4-7 4z"/></symbol>
+    <symbol id="i-me" viewBox="0 0 24 24"><path d="M3.5 10.5L20.5 3.5l-7 17-2.2-7.8z"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
     <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
@@ -278,8 +381,8 @@
 <div class="app-root">
   <header>
     <div class="brand">
-      <svg class="brand-mark mark-dark" viewBox="0 0 64 64" aria-hidden="true"><path fill="url(#aeroGrad)" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><polygon fill="#DCFCE7" stroke="#052E16" stroke-width="1.6" stroke-linejoin="round" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>
-      <svg class="brand-mark mark-light" viewBox="0 0 64 64" aria-hidden="true"><path fill="none" stroke="#14532D" stroke-width="3" stroke-linejoin="round" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><polygon fill="url(#aeroGrad)" stroke="#14532D" stroke-width="2" stroke-linejoin="round" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>
+      <svg class="brand-mark mark-dark" viewBox="0 0 64 64" aria-hidden="true"><path fill="url(#aeroGrad)" stroke="#4ADE80" stroke-opacity=".45" stroke-width="1" stroke-linejoin="round" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><path fill="none" stroke="#052E16" stroke-opacity=".7" stroke-width="1.6" stroke-linecap="round" d="M32 19V4M41.5 24.5L55.5 17M41.5 35.5L53.4 42.4M32 41V60.3M22.5 24.5L8.5 17M22.5 35.5L10.6 42.4"/><polygon fill="#DCFCE7" stroke="#052E16" stroke-width="1.6" stroke-linejoin="round" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>
+      <svg class="brand-mark mark-light" viewBox="0 0 64 64" aria-hidden="true"><path fill="none" stroke="#14532D" stroke-width="3" stroke-linejoin="round" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><path fill="none" stroke="#14532D" stroke-width="2" stroke-linecap="round" d="M32 19V4M41.5 24.5L55.5 17M41.5 35.5L53.4 42.4M32 41V60.3M22.5 24.5L8.5 17M22.5 35.5L10.6 42.4"/><polygon fill="url(#aeroGrad)" stroke="#14532D" stroke-width="2" stroke-linejoin="round" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>
       <h1>A.E.R.O.</h1>
       <span class="brand-sub">Field system · W.A. Hazel × Aero Animal Rescue</span>
     </div>
@@ -308,13 +411,36 @@
       <button class="btn-map-tool" onclick="resetMapView()" title="Recenter site">
         <svg class="icon"><use href="#i-recenter"/></svg><span class="t">Recenter site</span>
       </button>
+      <button class="btn-map-tool" id="btnLocate" onclick="locateMe()" title="My location">
+        <svg class="icon"><use href="#i-me"/></svg><span class="t">My location</span>
+      </button>
     </div>
+
+    <!-- [A.E.R.O. field] live location bar + in-app guidance to the turtle and its release point -->
+    <div id="mapTop">
+      <div id="locBar" role="status" aria-live="polite"><span class="lb-dot"></span><span id="locText"></span><button type="button" id="locRetry" onclick="startLocation(true)">Retry</button></div>
+      <div id="navHud" role="region" aria-label="Guidance" aria-live="polite">
+        <div class="nh-row">
+          <svg class="nh-arrow" id="navArrow" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22" class="nh-ring"/><path d="M24 6l10 30-10-6-10 6z" class="nh-tip"/></svg>
+          <div class="nh-main">
+            <div class="nh-to" id="navTo">To turtle</div>
+            <div class="nh-dist" id="navDist">--</div>
+            <div class="nh-sub" id="navSub">Waiting for GPS</div>
+          </div>
+          <button type="button" class="nh-stop" onclick="stopNav()" aria-label="Stop guidance"><svg class="icon"><use href="#i-x"/></svg></button>
+        </div>
+        <button type="button" class="nh-next" id="navNext"></button>
+      </div>
+    </div>
+
+    <button type="button" id="meChip" onclick="locateMe()" aria-label="You're off screen: show my location"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 18-7-4-7 4z"/></svg><span></span></button>
 
     <div class="map-legend" aria-label="Map legend">
       <span><svg class="lg-pin" viewBox="0 0 64 64" style="--c:var(--high)"><path d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/></svg>High</span>
       <span><svg class="lg-pin" viewBox="0 0 64 64" style="--c:var(--review)"><path d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/></svg>Review</span>
       <span><svg class="lg-pin" viewBox="0 0 64 64" style="--c:var(--reloc)"><path d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/></svg>Relocated</span>
       <span><svg class="lg-pin false" viewBox="0 0 64 64" style="--c:var(--false)"><path d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/></svg>False</span>
+      <span><span class="lg-dia"></span>Confirmed</span>
       <span class="lg-sep"></span>
       <span><span class="lg-sw" style="background:color-mix(in srgb,var(--high) 45%,transparent)"></span>Check inside fence</span>
       <span><span class="lg-sw" style="background:color-mix(in srgb,var(--reloc) 40%,transparent)"></span>Cover outside</span>
@@ -365,6 +491,7 @@
           <div><span class="lbl">Sensors</span><span class="val" id="detailSensors"></span></div>
           <div><span class="lbl">Species</span><span class="val" id="detailSpecies">Not confirmed</span></div>
           <div class="full"><span class="lbl">Last update</span><span class="val" id="detailUpdated">None yet</span></div>
+          <div class="full" id="detailLogRow" style="display:none"><span class="lbl">Field log</span><span class="val text log" id="detailLog"></span></div>
           <div class="full"><span class="lbl">Note</span><span class="val text" id="detailNote"></span></div>
         </div>
 
@@ -380,9 +507,9 @@
           <ul class="relocation-reasons-list" id="relocationReasons"></ul>
         </div>
 
-        <a id="btnNavMaps" class="btn-nav-gmaps" href="#" target="_blank" rel="noopener">
+        <button type="button" id="btnNavMaps" class="btn-nav-gmaps" onclick="startNav('turtle')">
           <svg class="icon"><use href="#i-nav"/></svg> NAVIGATE TO TURTLE
-        </a>
+        </button>
 
         <div>
           <span class="lbl">Responder action</span>
@@ -403,6 +530,58 @@
   </div>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
+
+<!-- [A.E.R.O. field] responder note: in-app sheet instead of the browser's prompt box -->
+<div id="noteModal" role="dialog" aria-modal="true" aria-labelledby="noteTitle" hidden>
+  <form class="nm-card" id="noteForm">
+    <div class="nm-head">
+      <span class="nm-chip" id="noteStatus">Relocated</span>
+      <button type="button" class="nm-x" onclick="closeNote(null)" aria-label="Cancel"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <h2 class="nm-title" id="noteTitle">Spot</h2>
+    <div class="nm-auto mono" id="logAuto"></div>
+    <!-- [A.E.R.O. field] field log: mirrors the A.E.R.O. Turtle Health Assessment sheet (sections 1-5); fill only what you saw -->
+    <div id="fieldLog">
+      <details class="fl" open><summary>Individual <span class="fl-n" data-sum="ind"></span></summary>
+        <div class="fl-q"><span class="lbl">Species</span><div class="seg" data-k="species" data-opts="Eastern box turtle|Other / uncertain"></div>
+          <input class="fl-in" data-k="species_other" placeholder="Which species, or why uncertain" hidden></div>
+        <div class="fl-q"><span class="lbl">Sex</span><div class="seg" data-k="sex" data-opts="Male|Female|Unknown|Not assessed"></div></div>
+        <div class="fl-q"><span class="lbl">Age class</span><div class="seg" data-k="age_class" data-opts="Adult|Subadult|Juvenile|Hatchling"></div></div>
+        <div class="fl-q"><span class="lbl">Measurements</span><div class="fl-grid">
+          <label>Mass<span><input type="number" inputmode="decimal" min="0" data-k="mass_g"><i>g</i></span></label>
+          <label>Carapace length<span><input type="number" inputmode="decimal" min="0" data-k="scl_mm"><i>mm</i></span></label>
+          <label>Carapace width<span><input type="number" inputmode="decimal" min="0" data-k="width_mm"><i>mm</i></span></label>
+          <label>Shell height<span><input type="number" inputmode="decimal" min="0" data-k="height_mm"><i>mm</i></span></label>
+          <label>Plastron length<span><input type="number" inputmode="decimal" min="0" data-k="plastron_mm"><i>mm</i></span></label>
+        </div></div>
+      </details>
+      <details class="fl"><summary>Encounter <span class="fl-n" data-sum="enc"></span></summary>
+        <div class="fl-q"><span class="lbl">Type</span><div class="seg" data-k="encounter_type" data-opts="Field capture|Found / in care|Rescue / transfer|Recapture / follow-up|Other"></div></div>
+        <div class="fl-q"><span class="lbl">Substrate / habitat</span><div class="seg" data-k="substrate" data-opts="Bare dirt|Leaf litter|Grass|Brush|Gravel|Along silt fence|Other"></div></div>
+        <div class="fl-q"><span class="lbl">Circumstances / activity</span><input class="fl-in" data-k="circumstances" placeholder="Walking the fence, buried, basking..."></div>
+      </details>
+      <details class="fl"><summary>Health check <span class="fl-n" data-sum="exam"></span></summary>
+        <p class="fl-hint">WNL = looks normal · ABN = abnormal, describe below · NE = not examined. Record what you see; don't diagnose.</p>
+        <div id="examRows"></div>
+        <div class="fl-q"><span class="lbl">Findings</span><input class="fl-in" data-k="findings" placeholder="Where, what it looks like, fresh or healing"></div>
+      </details>
+      <details class="fl"><summary>Photos <span class="fl-n" data-sum="photos"></span></summary>
+        <div class="seg multi" data-k="photos" data-opts="Dorsal shell|Plastron|Left side|Right side|Head / face|Lesion detail|ID card visible|Scale in frame"></div>
+      </details>
+      <details class="fl"><summary>Disposition <span class="fl-n" data-sum="disp"></span></summary>
+        <div class="seg" data-k="disposition" data-opts="Relocated off site|Released at site|Admitted to care|Transferred|Held for observation|Other"></div>
+        <input class="fl-in" data-k="disposition_location" placeholder="Where it went / who received it">
+      </details>
+    </div>
+    <label class="lbl" for="noteText">Field note</label>
+    <textarea id="noteText" rows="3" placeholder="What did you find? Size, sex, condition, where you moved it"></textarea>
+    <div class="nm-tags" id="noteTags"></div>
+    <div class="nm-actions">
+      <button type="button" class="nm-cancel" onclick="closeNote(null)">Cancel</button>
+      <button type="submit" class="nm-save" id="noteSave">Save</button>
+    </div>
+  </form>
+</div>
 
 <script>
   // [A.E.R.O. integration] use the server this page came from (works on localhost, a tunnel, or real hosting)
@@ -591,6 +770,8 @@
     if (!map) return;   // the tiles restyle through CSS; pins, zones and the heat map re-read the theme colors
     renderZones(); renderAlertMarkers(); restyleHeatmap();
     if (activeAlert && lastRelocation) renderRelocationGuide(activeAlert, lastRelocation);
+    if (meAcc) meAcc.setStyle({ color: css('--me'), fillColor: css('--me') });
+    if (nav && nav.line) nav.line.setStyle({ color: css('--me') });
   }
   function toggleTheme() { applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); }
 
@@ -608,6 +789,10 @@
     zonesLayer = L.layerGroup().addTo(map);
     heatmapLayer = L.layerGroup();
     relocationLayer = L.layerGroup().addTo(map);
+    navLayer = L.layerGroup().addTo(map);
+    meLayer = L.layerGroup().addTo(map);
+    map.on('dragstart', () => { followMe = false; });
+    map.on('move zoom resize', () => placeMeChip());
   }
 
   function renderZones() {
@@ -749,7 +934,7 @@
     document.body.classList.add('detail-open');
     renderAlertMarkers();
 
-    document.getElementById('btnNavMaps').href = `https://www.google.com/maps/dir/?api=1&destination=${alert.lat},${alert.lon}`;
+    if (nav && nav.id !== alert.alert_id) stopNav();
     // Fetch or mock Relocation Suggestion (F1 feature from Naz / Tanya)
     let relocation = MOCK_RELOCATIONS[alert.alert_id];
     try {
@@ -782,6 +967,8 @@
     document.getElementById('detailTime').innerText = whenText(alert.created_at);
     document.getElementById('detailCoords').innerText = `${alert.lat.toFixed(6)}, ${alert.lon.toFixed(6)}`;
     document.getElementById('detailSpecies').innerText = alert.species || 'Not confirmed';
+    const logTxt = logSummary(alert.record, alert);
+    document.getElementById('detailLogRow').style.display = logTxt ? '' : 'none'; document.getElementById('detailLog').innerText = logTxt;
     document.getElementById('detailNote').innerText = alert.note || 'No responder note yet';
 
     const badge = document.getElementById('detailConfidenceBadge');
@@ -833,6 +1020,7 @@
   }
 
   function closeDetail() {
+    stopNav();
     activeAlert = null;
     lastRelocation = null;
     relocationLayer.clearLayers();
@@ -845,13 +1033,16 @@
   async function updateAlertStatus(newStatus) {
     if (!activeAlert) return;
     const alertId = activeAlert.alert_id;
-    const note = prompt(`Enter responder field note for ${alertId}:`, activeAlert.note || '');
+    const log = await askNote(activeAlert, newStatus);
+    if (log === null) return;   // cancelled: nothing changes
+    const note = log.note, rec = log.record;
+    const species = rec ? (rec.species === 'Other / uncertain' ? (rec.species_other || 'Uncertain') : rec.species || '') : undefined;
 
     try {
       await fetch(`${API_BASE}/alerts/${alertId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, note: note || '', user: myName() })
+        body: JSON.stringify({ status: newStatus, note: note || '', user: myName(), ...(rec ? { species, sex: rec.sex || '', record: rec } : {}) })
       });
     } catch (e) {}
 
@@ -859,12 +1050,97 @@
     if (target) {
       target.status = newStatus;
       if (note !== null) target.note = note;
+      if (rec) Object.assign(target, { species, sex: rec.sex || '', record: rec });
     }
 
     renderAlertMarkers();
     renderAlertsList();
     openDetail(target);
   }
+
+  // in-app note sheet (replaces the browser prompt): resolves with the note, or null on Cancel / Esc / tapping outside
+  const NOTE_UI = {
+    relocated: { label: 'Relocated', c: '--reloc', tags: ['Let it walk off', 'Carried to cover', 'Faced away from site'] },
+    confirmed: { label: 'Confirmed turtle', c: '--high', tags: ['Left in place', 'Needs pickup', 'Let it walk off'] },
+    false_positive: { label: 'False alarm', c: '--false', tags: ['Rock', 'Leaf litter', 'Debris', 'Shadow', 'Nothing there'] },
+  };
+  let noteDone = null, logRec = {};
+  const EXAM = [['posture', 'Posture / response'], ['respiration', 'Respiration'], ['eyes', 'Eyes / eyelids'], ['nares', 'Nares / face'],
+                ['carapace', 'Carapace (top shell)'], ['plastron', 'Plastron (bottom shell)'], ['margins', 'Bridge / shell margins'],
+                ['skin', 'Skin / limbs / claws'], ['tail', 'Tail / cloaca'], ['parasites', 'Parasites / fly eggs'], ['gait', 'Gait / limb use']];
+  document.getElementById('examRows').innerHTML = EXAM.map(([k, l]) => `<div class="ex-row"><span>${l}</span><div class="seg" data-k="exam.${k}" data-opts="WNL|ABN|NE"></div></div>`).join('');
+  document.querySelectorAll('#noteModal .seg').forEach(g => {
+    g.innerHTML = g.dataset.opts.split('|').map(o => `<button type="button" data-v="${o}">${o}</button>`).join('');
+    g.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      const k = g.dataset.k, v = b.dataset.v;
+      if (g.classList.contains('multi')) { const set = new Set(logRec[k] || []); set.has(v) ? set.delete(v) : set.add(v); logRec[k] = [...set]; }
+      else setRec(k, getRec(k) === v ? '' : v);   // tap again to clear
+      paintLog();
+    });
+  });
+  document.querySelectorAll('#noteModal [data-k]:is(input)').forEach(i => i.addEventListener('input', () => { setRec(i.dataset.k, i.value.trim()); paintLog(true); }));
+  function getRec(k) { const [a, b] = k.split('.'); return b ? (logRec[a] || {})[b] || '' : logRec[a] ?? ''; }
+  function setRec(k, v) { const [a, b] = k.split('.'); if (b) { logRec[a] = { ...(logRec[a] || {}) }; v ? logRec[a][b] = v : delete logRec[a][b]; } else if (v === '' || v == null) delete logRec[a]; else logRec[a] = v; }
+  function paintLog(inputsOnly) {
+    const m = document.getElementById('noteModal');
+    if (!inputsOnly) {
+      m.querySelectorAll('.seg').forEach(g => g.querySelectorAll('button').forEach(b => b.classList.toggle('on', g.classList.contains('multi') ? (logRec[g.dataset.k] || []).includes(b.dataset.v) : getRec(g.dataset.k) === b.dataset.v)));
+      m.querySelectorAll('input[data-k]').forEach(i => { if (document.activeElement !== i) i.value = getRec(i.dataset.k); });
+      m.querySelector('[data-k="species_other"]').hidden = logRec.species !== 'Other / uncertain';
+    }
+    const ms = [['mass_g', 'g'], ['scl_mm', 'mm SCL']].filter(([k]) => logRec[k]).map(([k, u]) => logRec[k] + ' ' + u);
+    const ex = Object.values(logRec.exam || {}), abn = ex.filter(v => v === 'ABN').length;
+    const sums = { ind: [logRec.species === 'Other / uncertain' ? (logRec.species_other || 'Other') : logRec.species, logRec.sex, logRec.age_class, ...ms].filter(Boolean).join(' · '),
+                   enc: [logRec.encounter_type, logRec.substrate].filter(Boolean).join(' · '),
+                   exam: ex.length ? (abn ? `${abn} abnormal` : 'normal') + ` · ${ex.filter(v => v !== 'NE').length}/${EXAM.length} checked` : '',
+                   photos: (logRec.photos || []).length ? `${logRec.photos.length} checked` : '', disp: logRec.disposition || '' };
+    m.querySelectorAll('[data-sum]').forEach(el => { el.textContent = sums[el.dataset.sum]; });
+  }
+  // one line for the detail panel and the report: what the field log says about this turtle
+  function logSummary(r, a) {
+    if (!r || !Object.keys(r).length) return a && a.sex ? [a.sex].join('') : '';
+    const sp = r.species === 'Other / uncertain' ? (r.species_other || 'Species uncertain') : '';
+    const abn = Object.entries(r.exam || {}).filter(([, v]) => v === 'ABN').map(([k]) => (EXAM.find(e => e[0] === k) || [k, k])[1].split(' (')[0].toLowerCase());
+    return [sp, r.sex, r.age_class, r.scl_mm && `SCL ${r.scl_mm} mm`, r.mass_g && `${r.mass_g} g`, r.substrate && `found on ${r.substrate.toLowerCase()}`,
+            abn.length ? 'abnormal: ' + abn.join(', ') : Object.keys(r.exam || {}).length ? 'health check normal' : '', r.findings, r.disposition].filter(Boolean).join(' · ');
+  }
+  function askNote(alert, status) {
+    const ui = NOTE_UI[status] || { label: status, c: '--accent', tags: [] }, m = document.getElementById('noteModal'), t = document.getElementById('noteText');
+    const turtle = status !== 'false_positive';
+    m.querySelector('.nm-card').style.setProperty('--c', `var(${ui.c})`);
+    document.getElementById('noteStatus').textContent = ui.label;
+    document.getElementById('noteTitle').textContent = `(${alertNum(alert)}) ${alertName(alert)}`;
+    const now = new Date(), who = myName();
+    logRec = JSON.parse(JSON.stringify(alert.record || {}));
+    if (turtle) {   // section 1 basics the app already knows; the responder doesn't type these
+      if (!logRec.species && alert.species) logRec.species = /box/i.test(alert.species) ? 'Eastern box turtle' : 'Other / uncertain';
+      if (!logRec.species_other && alert.species && !/box/i.test(alert.species)) logRec.species_other = alert.species;
+      if (!logRec.sex && alert.sex) logRec.sex = alert.sex;
+      if (!logRec.encounter_type) logRec.encounter_type = 'Field capture';
+      if (status === 'relocated' && !logRec.disposition) logRec.disposition = 'Relocated off site';
+      if (status === 'relocated' && !logRec.disposition_location && lastRelocation && lastRelocation.alert_id === alert.alert_id)
+        logRec.disposition_location = `${lastRelocation.target_lat.toFixed(6)}, ${lastRelocation.target_lon.toFixed(6)} (${Math.round(lastRelocation.distance_m)} m ${compass(lastRelocation.bearing_deg)})`;
+    }
+    Object.assign(logRec, { date: now.toLocaleDateString('en-CA'), time: now.toTimeString().slice(0, 5), lat: alert.lat, lon: alert.lon,
+                            site: 'Grayson Overlook', county_state: 'Prince William County, VA', observer: who });
+    document.getElementById('logAuto').textContent = `${logRec.date} · ${logRec.time} · ${alert.lat.toFixed(5)}, ${alert.lon.toFixed(5)}${who ? ' · ' + who.toUpperCase() : ''}`;
+    document.getElementById('fieldLog').hidden = !turtle;
+    paintLog();
+    t.value = alert.note || '';
+    const tags = document.getElementById('noteTags'); tags.innerHTML = '';
+    ui.tags.forEach(tag => { const b = document.createElement('button'); b.type = 'button'; b.textContent = tag; b.classList.toggle('on', t.value.includes(tag));
+      b.onclick = () => { t.value = t.value.includes(tag) ? t.value.replace(new RegExp('(, )?' + tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '').replace(/^, /, '') : (t.value.trim() ? t.value.trim().replace(/[.,]$/, '') + ', ' : '') + tag; b.classList.toggle('on'); };
+      tags.appendChild(b); });
+    m.hidden = false; m.querySelector('.nm-card').scrollTop = 0;
+    if (!phoneView() && !turtle) setTimeout(() => t.focus(), 30);
+    return new Promise(res => { noteDone = res; }).then(note => note === null ? null : { note, record: turtle ? logRec : null });
+  }
+  function closeNote(v) { document.getElementById('noteModal').hidden = true; const d = noteDone; noteDone = null; d && d(v); }
+  document.getElementById('noteForm').addEventListener('submit', e => { e.preventDefault(); closeNote(document.getElementById('noteText').value.trim()); });
+  document.getElementById('noteModal').addEventListener('pointerdown', e => { if (e.target.id === 'noteModal') closeNote(null); });
+  document.getElementById('noteText').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); document.getElementById('noteForm').requestSubmit(); } });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && noteDone) closeNote(null); });
 
   function switchTab(tab) {
     document.getElementById('tabAlertsBtn').classList.toggle('active', tab === 'alerts');
@@ -1011,8 +1287,8 @@
   function isSheetDown(kind) { return kind === 'list' ? document.body.classList.contains('sheet-down') : document.getElementById('detailSheet').classList.contains('down'); }
   function setSheet(kind, down) {
     if (kind === 'list') document.body.classList.toggle('sheet-down', down);
-    else document.getElementById('detailSheet').classList.toggle('down', down);
-    setTimeout(() => map.invalidateSize(), 280);
+    else { const d = document.getElementById('detailSheet'); d.classList.toggle('down', down); if (down) d.scrollTop = 0; }
+    setTimeout(() => { map.invalidateSize(); placeMeChip(); }, 280);
   }
   document.querySelectorAll('.sheet-handle').forEach(h => {
     let y0 = null, dragged = false;
@@ -1060,8 +1336,159 @@
     }
   }
 
+  // [A.E.R.O. field] live location: a you-are-here dot that follows the phone, plus in-app guidance
+  // (no Google Maps): a straight walking line, distance and an arrow that turns with the phone, from you to the
+  // turtle, then from the turtle to its release point. Location needs HTTPS (the tunnel) or localhost.
+  let navLayer, meLayer, meMarker = null, meAcc = null, me = null, heading = null, geoWatch = null, geoState = 'off', followMe = false, nav = null, wake = null, compassOn = false, navPushedList = false;
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const R_EARTH = 6371000, rad = d => d * Math.PI / 180;
+  const distM = (a, b) => { const dl = rad(b.lat - a.lat), dn = rad(b.lon - a.lon), h = Math.sin(dl / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dn / 2) ** 2; return 2 * R_EARTH * Math.asin(Math.sqrt(h)); };
+  const bearingTo = (a, b) => { const y = Math.sin(rad(b.lon - a.lon)) * Math.cos(rad(b.lat)), x = Math.cos(rad(a.lat)) * Math.sin(rad(b.lat)) - Math.sin(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.cos(rad(b.lon - a.lon)); return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360; };
+  const fmtDist = m => m < 1000 ? `${Math.round(m)} M<small>${Math.round(m / 0.3048)} FT</small>` : `${(m / 1000).toFixed(1)} KM<small>${(m / 1609.34).toFixed(1)} MI</small>`;
+
+  function setGeo(state) {
+    geoState = state;
+    const msg = {
+      denied: isIOS ? 'Location is blocked. Turn it on: Settings › Privacy & Security › Location Services › Safari Websites › While Using, then Retry.'
+                    : 'Location is blocked. Allow location for this site (the icon at the left of the address bar), then Retry.',
+      insecure: 'Location needs the secure link. Open A.E.R.O. through the https tunnel address, not http.',
+      unsupported: 'This browser can\'t share location. Use Safari or Chrome on the phone.',
+      lost: 'Searching for GPS. Step into the open if you\'re under cover.',
+      asking: 'Allow location so A.E.R.O. can show where you are and guide you to the turtle.',
+    }[state];
+    document.getElementById('locBar').classList.toggle('on', !!msg); document.body.classList.toggle('geo-warn', !!msg);
+    document.getElementById('locText').textContent = msg || '';
+    document.getElementById('locRetry').style.display = state === 'denied' || state === 'lost' ? '' : 'none';
+    document.getElementById('btnLocate').classList.toggle('active', state === 'on' && followMe);
+  }
+  function startLocation(retry) {
+    if (!('geolocation' in navigator)) return setGeo('unsupported');
+    if (!window.isSecureContext) return setGeo('insecure');
+    if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch);
+    if (geoState !== 'on') setGeo('asking');
+    geoWatch = navigator.geolocation.watchPosition(onPos, e => setGeo(e.code === 1 ? 'denied' : (me ? 'on' : 'lost')), { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+    if (!isIOS) startCompass();   // Android/desktop: no permission prompt for the compass
+  }
+  // if the responder changes the permission in the browser, pick it up without a reload
+  try { navigator.permissions && navigator.permissions.query({ name: 'geolocation' }).then(p => { p.onchange = () => { if (p.state === 'granted') startLocation(); else if (p.state === 'denied') setGeo('denied'); }; }); } catch (e) {}
+
+  function onPos(p) {
+    const c = p.coords; me = { lat: c.latitude, lon: c.longitude, acc: c.accuracy, gpsHead: c.speed > 0.6 && c.heading != null && !isNaN(c.heading) ? c.heading : null, t: Date.now() };
+    if (geoState !== 'on') setGeo('on');
+    drawMe();
+    if (followMe && !(nav && distM(me, nav) > 1000)) map.panTo([me.lat, me.lon], { animate: true });
+    if (nav) updateNav();
+    placeMeChip();
+  }
+  const curHeading = () => heading != null ? heading : me && me.gpsHead;
+  function drawMe() {
+    if (!me || !map) return;
+    const ll = [me.lat, me.lon];
+    if (!meMarker) {
+      meAcc = L.circle(ll, { radius: me.acc, color: css('--me'), weight: 1, opacity: .5, fillColor: css('--me'), fillOpacity: .1, interactive: false }).addTo(meLayer);
+      meMarker = L.marker(ll, { icon: L.divIcon({ className: '', iconSize: [22, 22], iconAnchor: [11, 11], html: '<div class="me"><span class="me-cone"></span><span class="me-pulse"></span><span class="me-dot"></span></div>' }), zIndexOffset: 2000, keyboard: false })
+        .bindTooltip('YOU', { direction: 'top', offset: [0, -10] }).addTo(meLayer);
+    }
+    meMarker.setLatLng(ll); meAcc.setLatLng(ll).setRadius(Math.min(me.acc, 200));
+    const el = meMarker.getElement() && meMarker.getElement().querySelector('.me'), h = curHeading();
+    if (el) { el.classList.toggle('has-head', h != null); if (h != null) el.querySelector('.me-cone').style.transform = `rotate(${h}deg)`; }
+  }
+
+  // when you're off the visible map, a chip on the map edge points toward you with the distance; tap it to jump there
+  function placeMeChip() {
+    const chip = document.getElementById('meChip');
+    if (!me || !map || !nav) return chip.classList.remove('on');   // only while guiding, so it isn't always on screen
+    const mr = map.getContainer().getBoundingClientRect();
+    let bottom = mr.height;   // phone: the bottom sheets cover part of the map
+    ['.sidebar', '#detailSheet.open'].forEach(q => { const el = document.querySelector(q); if (!el || !phoneView()) return; const t = el.getBoundingClientRect().top - mr.top; if (t > 0 && t < bottom) bottom = t; });
+    const box = { x0: 12, y0: 12, x1: mr.width - (phoneView() ? 70 : 12), y1: bottom - 12 };
+    const p = map.latLngToContainerPoint([me.lat, me.lon]);
+    if (p.x > box.x0 && p.x < box.x1 && p.y > box.y0 && p.y < box.y1) return chip.classList.remove('on');
+    const cx = (box.x0 + box.x1) / 2, cy = (box.y0 + box.y1) / 2, mid = map.containerPointToLatLng([cx, cy]);
+    chip.querySelector('span').textContent = 'You · ' + fmtDist(distM({ lat: mid.lat, lon: mid.lng }, me)).replace(/<small>.*$/, '');
+    chip.classList.add('on');
+    const hw = chip.offsetWidth / 2 + 4, hh = chip.offsetHeight / 2 + 4, dx = p.x - cx, dy = p.y - cy;
+    const k = Math.min(dx ? (dx > 0 ? box.x1 - hw - cx : box.x0 + hw - cx) / dx : Infinity, dy ? (dy > 0 ? box.y1 - hh - cy : box.y0 + hh - cy) / dy : Infinity);
+    chip.style.left = (cx + dx * k) + 'px'; chip.style.top = (cy + dy * k) + 'px';
+    chip.querySelector('svg').style.transform = `rotate(${Math.atan2(dx, -dy) * 180 / Math.PI}deg)`;
+  }
+
+  // phone compass; iPhone asks for permission and only from a tap, so this also runs on My location / Navigate
+  function startCompass() {
+    if (compassOn || !window.DeviceOrientationEvent) return;
+    const attach = () => { compassOn = true; addEventListener('deviceorientationabsolute', onOri, true); addEventListener('deviceorientation', onOri, true); };
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') DeviceOrientationEvent.requestPermission().then(r => { if (r === 'granted') attach(); }).catch(() => {});
+    else attach();
+  }
+  let oriQueued = false;
+  function onOri(e) {
+    let h = e.webkitCompassHeading != null ? e.webkitCompassHeading : (e.absolute && e.alpha != null ? 360 - e.alpha : null);
+    if (h == null) return;
+    h = (h + ((screen.orientation && screen.orientation.angle) || window.orientation || 0) + 360) % 360;
+    heading = h;
+    if (!oriQueued) { oriQueued = true; requestAnimationFrame(() => { oriQueued = false; drawMe(); if (nav) updateNav(true); }); }
+  }
+
+  function locateMe() {
+    startCompass();
+    if (geoState !== 'on') { startLocation(true); followMe = true; return; }
+    followMe = true; setGeo('on');
+    map.setView([me.lat, me.lon], Math.max(map.getZoom(), 19));
+  }
+
+  // ---- guidance: 'turtle' = you -> the flagged spot; 'release' = the turtle's spot -> Tanya's release point ----
+  function startNav(kind) {
+    if (!activeAlert) return;
+    const a = activeAlert, rel = lastRelocation;
+    if (kind === 'release' && !rel) return;
+    startCompass();
+    if (geoState !== 'on') startLocation(true);
+    nav = { id: a.alert_id, kind, arrived: false, num: alertNum(a), name: alertName(a),
+            lat: kind === 'release' ? rel.target_lat : a.lat, lon: kind === 'release' ? rel.target_lon : a.lon };
+    document.body.classList.add('nav-on');
+    if (phoneView()) { setSheet('detail', true); if (!isSheetDown('list')) { setSheet('list', true); navPushedList = true; } }   // phone: both sheets slide down so the map shows
+    navLayer.clearLayers();
+    nav.line = L.polyline([], { color: css('--me'), weight: 3, dashArray: '2, 8', lineCap: 'round', opacity: .95, interactive: false }).addTo(navLayer);
+    if (kind === 'turtle') L.marker([nav.lat, nav.lon], { icon: L.divIcon({ className: '', iconSize: [34, 34], iconAnchor: [17, 17], html: '<div class="nav-target"></div>' }), interactive: false, zIndexOffset: -10 }).addTo(navLayer);
+    try { navigator.wakeLock && navigator.wakeLock.request('screen').then(w => { wake = w; }).catch(() => {}); } catch (e) {}
+    followMe = true;
+    if (me && distM(me, nav) <= 1000) map.fitBounds(L.latLngBounds([[me.lat, me.lon], [nav.lat, nav.lon]]).pad(0.3), { maxZoom: 20 });
+    else map.setView([nav.lat, nav.lon], Math.max(map.getZoom(), 18));
+    updateNav(); placeMeChip();
+  }
+  function stopNav() {
+    if (!nav) return;
+    nav = null; navLayer.clearLayers(); document.body.classList.remove('nav-on'); placeMeChip();
+    if (navPushedList) { setSheet('list', false); navPushedList = false; }
+    try { wake && wake.release(); } catch (e) {} wake = null;
+  }
+  function updateNav(headingOnly) {
+    if (!nav) return;
+    const hud = document.getElementById('navHud'), next = document.getElementById('navNext');
+    document.getElementById('navTo').textContent = nav.kind === 'turtle' ? `To turtle · (${nav.num}) ${nav.name}` : `To release point · (${nav.num})`;
+    if (!me) { document.getElementById('navDist').textContent = '--'; document.getElementById('navSub').textContent = geoState === 'denied' ? 'Location is blocked' : 'Waiting for GPS'; return; }
+    const d = distM(me, nav), brg = bearingTo(me, nav), h = curHeading();
+    document.getElementById('navArrow').style.transform = `rotate(${h != null ? brg - h : brg}deg)`;
+    if (headingOnly) return;
+    nav.line.setLatLngs([[me.lat, me.lon], [nav.lat, nav.lon]]);
+    // arrived: inside GPS error (4-12 m); leave a few meters of slack so it doesn't flicker at the edge
+    const near = Math.max(4, Math.min(me.acc, 12));
+    if (!nav.arrived && d <= near) { nav.arrived = true; try { navigator.vibrate && navigator.vibrate([120, 60, 120]); } catch (e) {} }
+    else if (nav.arrived && d > near + 6) nav.arrived = false;
+    hud.classList.toggle('arrived', nav.arrived);
+    document.getElementById('navDist').innerHTML = nav.arrived ? (nav.kind === 'turtle' ? 'At the spot' : 'Release here') : fmtDist(d);
+    document.getElementById('navSub').textContent = nav.arrived
+      ? (nav.kind === 'turtle' ? 'Search within a few meters · GPS ±' + Math.round(me.acc) + ' m' : 'Set it down facing cover, let it walk off')
+      : d > 1000 ? `Off site · head ${compass(brg)} to Grayson`   // walking guidance only makes sense on site
+      : `Walk ${compass(brg)} · ${String(Math.round(brg)).padStart(3, '0')}° · ~${Math.max(1, Math.round(d / 1.2 / 60))} min${h == null ? ' · north up' : ''}${me.acc > 15 ? ' · GPS ±' + Math.round(me.acc) + ' m' : ''}`;
+    const showNext = nav.arrived && (nav.kind === 'release' || lastRelocation);
+    next.classList.toggle('on', !!showNext);
+    next.textContent = nav.kind === 'turtle' ? 'Got it · guide me to release point' : 'Mark relocated';
+    next.onclick = nav.kind === 'turtle' ? () => startNav('release') : () => { stopNav(); updateAlertStatus('relocated'); };
+  }
+
   // [A.E.R.O. UI] loading screen (canvas artboard 07) tracks the real loading; ENTER appears once everything is in
-  const loader = window.AeroLoading ? AeroLoading.show({ site: 'Grayson Overlook', onClose: () => map && map.invalidateSize() })
+  const loader = window.AeroLoading ? AeroLoading.show({ site: 'Grayson Overlook', onClose: () => { map && map.invalidateSize(); startLocation(); } })
                                     : { step() {}, ready() {} };
   initMap();
   (async function boot() {
