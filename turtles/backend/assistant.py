@@ -105,7 +105,7 @@ class AlertStore:
         self._cells = None
         self.state_path: Optional[Path] = None
 
-    KEEP = ("status", "species", "sex", "est_length_in", "notes", "note", "updated_at", "updated_by")
+    KEEP = ("status", "species", "sex", "est_length_in", "notes", "note", "record", "updated_at", "updated_by")
 
     def load_state(self, path, reset: bool = False):
         """Field changes survive a restart: kept in <pack>_state.json beside the pack (private data, not in git)."""
@@ -370,6 +370,9 @@ try:  # request body for POST /assistant; module level so FastAPI can resolve th
         status: Optional[str] = None
         note: Optional[str] = None
         user: Optional[str] = None
+        species: Optional[str] = None    # from the app's field log (A.E.R.O. health assessment, sections 1-5)
+        sex: Optional[str] = None
+        record: Optional[Dict[str, Any]] = None
 except ImportError:  # tests and offline use don't need pydantic
     Ask = Patch = None
 
@@ -463,6 +466,7 @@ def as_contract(a: Dict[str, Any]) -> Dict[str, Any]:
             "sensors": a.get("sensors", ["rgb"]), "detection_ids": a.get("detection_ids", []), "thumbnail": a.get("thumbnail", ""),
             "created_at": a.get("created_at", "2026-10-24T15:00:00Z"), "status": a["status"],
             "note": a.get("note") or " · ".join(x for x in parts if x), "number": a.get("number"), "species": a.get("species", ""),
+            "sex": a.get("sex", ""), "record": a.get("record") or {},
             "label": a.get("name") or a["alert_id"], "updated_at": a.get("updated_at", ""), "updated_by": a.get("updated_by", "")}
 
 
@@ -496,6 +500,9 @@ def app_router(store: AlertStore, mock_zones: bool):
         if a is None: raise HTTPException(404, "no such alert")
         if p.status in STATUSES: a["status"] = p.status
         if p.note is not None: a["note"] = p.note
+        if p.species is not None: a["species"] = p.species
+        if p.sex is not None: a["sex"] = p.sex
+        if p.record is not None: a["record"] = p.record
         store.touch(a, p.user or "")
         return as_contract(a)
 
