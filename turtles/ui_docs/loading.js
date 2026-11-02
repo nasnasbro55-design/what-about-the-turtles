@@ -7,7 +7,8 @@
  * (body.aero-boot, styled in index.html). Skips itself with ?skip in the URL. Reduced motion: one still frame, no glitch, no loop. */
 (function () {
   const css = `
-#aero-load{position:fixed;inset:0;z-index:20000;background:#0A140D;color:#E6EDE7;font-family:'Oxanium',sans-serif;overflow:hidden;transition:opacity .45s ease}
+html.al-on,html.al-on body{background:#0A140D!important}
+#aero-load{position:fixed;top:0;left:0;right:0;height:100vh;height:100lvh;z-index:20000;background:#0A140D;color:#E6EDE7;font-family:'Oxanium',sans-serif;overflow:hidden;transition:opacity .45s ease}
 #aero-load.out{opacity:0;pointer-events:none}
 #aero-load canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #aero-load .al-top{position:absolute;left:clamp(16px,3vw,40px);right:clamp(16px,3vw,40px);top:max(20px,env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -15,7 +16,7 @@
 #aero-load .mono{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.2em;text-transform:uppercase}
 #aero-load .al-sub{color:#9FB3A5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #aero-load .al-form{color:#4ADE80;white-space:nowrap}
-#aero-load .al-bot{position:absolute;left:16px;right:16px;bottom:max(36px,calc(env(safe-area-inset-bottom) + 20px));display:flex;flex-direction:column;align-items:center;gap:16px}
+#aero-load .al-bot{position:absolute;left:16px;right:16px;bottom:max(36px,calc(env(safe-area-inset-bottom) + 20px));bottom:calc(100lvh - 100dvh + max(36px,calc(env(safe-area-inset-bottom) + 20px)));display:flex;flex-direction:column;align-items:center;gap:16px}
 #aero-load .title{position:relative;font-size:clamp(46px,7vw,66px);font-weight:300;letter-spacing:.04em;line-height:1}
 #aero-load .al-status{width:min(420px,100%);display:flex;flex-direction:column;gap:10px}
 #aero-load .al-row{display:flex;justify-content:space-between;gap:12px;font-size:11.5px;letter-spacing:.14em}
@@ -62,7 +63,7 @@
       this.cycle = [['hold', 'turtle', 'turtle', 10], ['morph', 'turtle', 'shield', 1.8], ['hold', 'shield', 'shield', 6], ['morph', 'shield', 'drone', 1.8], ['hold', 'drone', 'drone', 7], ['morph', 'drone', 'turtle', 1.8]];
       this.boost = 0; this.resize();
     }
-    resize() { this.W = innerWidth; this.H = innerHeight; this.build(); }
+    resize() { this.W = this.cv.clientWidth || innerWidth; this.H = this.cv.clientHeight || innerHeight; this.build(); }
   mk() {
     const V = [], E = [], P = [{ kind: 'body' }]; let part = 0;
     const v = (x, y, z, c, w) => { V.push({ x, y, z, c, w: w ?? 1, part }); return V.length - 1; };
@@ -313,7 +314,7 @@
   function close() {
     if (!root || closed) return; closed = true;
     clearInterval(regl); clearTimeout(settle); removeEventListener('keydown', onKey); removeEventListener('resize', onResize);
-    const finish = () => { cancelAnimationFrame(raf); root.remove(); onClose && onClose(); };
+    const finish = () => { cancelAnimationFrame(raf); root.remove(); document.documentElement.classList.remove('al-on'); onClose && onClose(); };
     if (still) { root.classList.add('out'); setTimeout(finish, 470); return; }
     // ENTER: the screen glitches hard while a boot log runs, then powers down like a CRT and the dashboard glitches in behind it
     root.classList.add('settled', 'exit'); $('.al-enter').disabled = true;
@@ -345,7 +346,7 @@
         <div class="al-bot"><span class="title g d4" data-text="A.E.R.O.">A.E.R.O.</span>
           <div class="al-status g d5"><div class="al-row mono"><span class="al-label" style="color:#9FB3A5" aria-live="polite">LOADING SITE · ${(opts.site || 'Grayson Overlook').toUpperCase()}</span><span class="al-pct" style="color:#4ADE80">0%</span></div><div class="al-bar"><div class="al-fill"></div></div></div>
           <button class="al-enter" type="button">ENTER</button></div>`;
-      document.body.appendChild(root);
+      document.body.appendChild(root); document.documentElement.classList.add('al-on');
       eng = new Engine($('canvas')); eng.onForm = f => { $('.al-form').textContent = f; };
       eng.t0 = performance.now();
       if (still) eng.draw(eng.t0 + 3000); else { root.classList.add('run'); raf = requestAnimationFrame(loop); settle = setTimeout(() => root.classList.add('settled'), 3000); regl = setInterval(reglitch, 12000); }

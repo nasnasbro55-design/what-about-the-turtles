@@ -277,7 +277,7 @@
     #navHud.arrived .nh-arrow .nh-tip { fill: var(--reloc); } #navHud.arrived { border-color: var(--reloc); } #navHud.arrived .nh-dist { font-size: 26px; }
     .nh-main { flex: 1; min-width: 0; }
     .nh-to { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .nh-dist { font-family: var(--font-display); font-weight: 300; font-size: 34px; line-height: 1.1; color: var(--ink); }
+    .nh-dist { font-family: var(--font-display); font-weight: 300; font-size: 34px; line-height: 1.1; color: var(--ink); white-space: nowrap; }
     .nh-dist small { font-family: var(--font-mono); font-size: 12px; letter-spacing: .1em; color: var(--muted); margin-left: 8px; }
     .nh-sub { font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); }
     .nh-stop { width: 44px; height: 44px; flex-shrink: 0; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
@@ -289,7 +289,7 @@
     @media (max-width: 1100px) { #mapTop { left: 260px; transform: none; width: auto; right: 420px; } }
     @media (max-width: 768px) { body.detail-open #mapTop { left: 84px; } body.detail-open.nav-on #mapTop { left: 12px; }
       html body.detail-open.nav-on #ht-dock { top: auto; left: auto; right: 14px; bottom: calc(164px + env(safe-area-inset-bottom)); flex-direction: column-reverse; }
-      #mapTop { top: 12px; left: 12px; right: 68px; width: auto; transform: none; } .nh-arrow { width: 54px; height: 54px; } .nh-dist { font-size: 28px; } }
+      #mapTop { top: 12px; left: 12px; right: 68px; width: auto; transform: none; } .nh-arrow { width: 50px; height: 50px; } .nh-dist { font-size: 26px; } .nh-dist small { font-size: 11px; margin-left: 6px; } .nh-sub { font-size: 10px; letter-spacing: .1em; } #navHud { padding: 10px; } #navHud .nh-row { gap: 10px; } }
     @media (prefers-reduced-motion: reduce) { .me .me-pulse, .nav-target { animation: none; } .nh-arrow { transition: none; } }
     /* [A.E.R.O. UI] after ENTER the dashboard boots in with a glitch: panels slice in, the map flickers on, a scan line runs down */
     body.aero-boot header, body.aero-boot .sidebar, body.aero-boot .map-floating-panel, body.aero-boot .map-legend, body.aero-boot #ht-dock, body.aero-boot .leaflet-control-zoom { animation: bootIn .75s steps(1, end) both; }
@@ -1094,7 +1094,7 @@
   function isSheetDown(kind) { return kind === 'list' ? document.body.classList.contains('sheet-down') : document.getElementById('detailSheet').classList.contains('down'); }
   function setSheet(kind, down) {
     if (kind === 'list') document.body.classList.toggle('sheet-down', down);
-    else document.getElementById('detailSheet').classList.toggle('down', down);
+    else { const d = document.getElementById('detailSheet'); d.classList.toggle('down', down); if (down) d.scrollTop = 0; }
     setTimeout(() => { map.invalidateSize(); placeMeChip(); }, 280);
   }
   document.querySelectorAll('.sheet-handle').forEach(h => {
@@ -1183,7 +1183,7 @@
     const c = p.coords; me = { lat: c.latitude, lon: c.longitude, acc: c.accuracy, gpsHead: c.speed > 0.6 && c.heading != null && !isNaN(c.heading) ? c.heading : null, t: Date.now() };
     if (geoState !== 'on') setGeo('on');
     drawMe();
-    if (followMe) map.panTo([me.lat, me.lon], { animate: true });
+    if (followMe && !(nav && distM(me, nav) > 1000)) map.panTo([me.lat, me.lon], { animate: true });
     if (nav) updateNav();
     placeMeChip();
   }
@@ -1204,7 +1204,7 @@
   // when you're off the visible map, a chip on the map edge points toward you with the distance; tap it to jump there
   function placeMeChip() {
     const chip = document.getElementById('meChip');
-    if (!me || !map) return chip.classList.remove('on');
+    if (!me || !map || !nav) return chip.classList.remove('on');   // only while guiding, so it isn't always on screen
     const mr = map.getContainer().getBoundingClientRect();
     let bottom = mr.height;   // phone: the bottom sheets cover part of the map
     ['.sidebar', '#detailSheet.open'].forEach(q => { const el = document.querySelector(q); if (!el || !phoneView()) return; const t = el.getBoundingClientRect().top - mr.top; if (t > 0 && t < bottom) bottom = t; });
@@ -1259,12 +1259,13 @@
     if (kind === 'turtle') L.marker([nav.lat, nav.lon], { icon: L.divIcon({ className: '', iconSize: [34, 34], iconAnchor: [17, 17], html: '<div class="nav-target"></div>' }), interactive: false, zIndexOffset: -10 }).addTo(navLayer);
     try { navigator.wakeLock && navigator.wakeLock.request('screen').then(w => { wake = w; }).catch(() => {}); } catch (e) {}
     followMe = true;
-    if (me) map.fitBounds(L.latLngBounds([[me.lat, me.lon], [nav.lat, nav.lon]]).pad(0.3), { maxZoom: 20 });
-    updateNav();
+    if (me && distM(me, nav) <= 1000) map.fitBounds(L.latLngBounds([[me.lat, me.lon], [nav.lat, nav.lon]]).pad(0.3), { maxZoom: 20 });
+    else map.setView([nav.lat, nav.lon], Math.max(map.getZoom(), 18));
+    updateNav(); placeMeChip();
   }
   function stopNav() {
     if (!nav) return;
-    nav = null; navLayer.clearLayers(); document.body.classList.remove('nav-on');
+    nav = null; navLayer.clearLayers(); document.body.classList.remove('nav-on'); placeMeChip();
     if (navPushedList) { setSheet('list', false); navPushedList = false; }
     try { wake && wake.release(); } catch (e) {} wake = null;
   }
@@ -1285,7 +1286,7 @@
     document.getElementById('navDist').innerHTML = nav.arrived ? (nav.kind === 'turtle' ? 'At the spot' : 'Release here') : fmtDist(d);
     document.getElementById('navSub').textContent = nav.arrived
       ? (nav.kind === 'turtle' ? 'Search within a few meters · GPS ±' + Math.round(me.acc) + ' m' : 'Set it down facing cover, let it walk off')
-      : d > 1000 ? `Off site · ${compass(brg)} of you · get to Grayson Overlook first`   // walking guidance only makes sense on site
+      : d > 1000 ? `Off site · head ${compass(brg)} to Grayson`   // walking guidance only makes sense on site
       : `Walk ${compass(brg)} · ${String(Math.round(brg)).padStart(3, '0')}° · ~${Math.max(1, Math.round(d / 1.2 / 60))} min${h == null ? ' · north up' : ''}${me.acc > 15 ? ' · GPS ±' + Math.round(me.acc) + ' m' : ''}`;
     const showNext = nav.arrived && (nav.kind === 'release' || lastRelocation);
     next.classList.toggle('on', !!showNext);
