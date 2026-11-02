@@ -127,6 +127,8 @@
     .map-legend > span { display: inline-flex; align-items: center; gap: 7px; }
     .lg-pin { width: 12px; height: 14px; } .lg-pin path { fill: var(--c); stroke: var(--c); stroke-width: 6; } .lg-pin.false path { fill: transparent; }
     .lg-sw { width: 16px; height: 8px; }
+    .lg-dia { width: 8px; height: 8px; margin: 0 2px; background: var(--high); transform: rotate(45deg); border-radius: 1px; }
+    .pin-confirmed::after { content: ''; position: absolute; right: -3px; top: -3px; width: 9px; height: 9px; background: var(--c); border: 2px solid var(--on-pin); border-radius: 2px; transform: rotate(45deg); }
     .lg-sep { width: 1px; height: 14px; background: var(--line); }
 
     /* Sidebar */
@@ -214,7 +216,7 @@
     .triage-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
     .btn-triage { --c: var(--muted); min-height: 56px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); background: var(--panel); color: var(--c); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
     .btn-triage:hover { background: color-mix(in srgb, var(--c) 10%, var(--panel)); }
-    .btn-relocated { --c: var(--reloc); } .btn-confirmed { --c: var(--review); } .btn-fp { --c: var(--false); }
+    .btn-relocated { --c: var(--reloc); } .btn-confirmed { --c: var(--high); } .btn-fp { --c: var(--false); }
 
     /* A.E.R.O. voice button: sits on the map, left of the zoom buttons */
     html body #ht-dock { right: 484px; bottom: 20px; flex-direction: column; align-items: flex-end; gap: 8px; }   /* CHAT sits above TAP TO TALK, clear of the legend */
@@ -291,6 +293,53 @@
       html body.detail-open.nav-on #ht-dock { top: auto; left: auto; right: 14px; bottom: calc(164px + env(safe-area-inset-bottom)); flex-direction: column-reverse; }
       #mapTop { top: 12px; left: 12px; right: 68px; width: auto; transform: none; } .nh-arrow { width: 50px; height: 50px; } .nh-dist { font-size: 26px; } .nh-dist small { font-size: 11px; margin-left: 6px; } .nh-sub { font-size: 10px; letter-spacing: .1em; } #navHud { padding: 10px; } #navHud .nh-row { gap: 10px; } }
     @media (prefers-reduced-motion: reduce) { .me .me-pulse, .nav-target { animation: none; } .nh-arrow { transition: none; } }
+    /* [A.E.R.O. field] responder note sheet: centered on a laptop, at the top on a phone so the keyboard never covers it */
+    #noteModal { position: fixed; inset: 0; z-index: 13000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2, 8, 4, .55); }
+    #noteModal[hidden] { display: none; }
+    .nm-card { --c: var(--accent); width: min(460px, 100%); display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--c); box-shadow: 0 24px 60px rgba(0,0,0,.45); animation: nmIn .18s ease-out; }
+    .nm-head { display: flex; align-items: center; justify-content: space-between; }
+    .nm-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 4px; border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); color: var(--c); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; }
+    .nm-x { width: 40px; height: 40px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+    .nm-title { font-family: var(--font-display); font-weight: 500; font-size: 20px; line-height: 1.25; color: var(--ink); margin-bottom: 4px; }
+    #noteText { width: 100%; min-height: 96px; resize: vertical; padding: 12px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--bg); color: var(--ink); font: 16px/1.45 var(--font-sans); }
+    #noteText:focus { outline: none; border-color: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 20%, transparent); }
+    .nm-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .nm-tags button { min-height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--line-strong); background: transparent; color: var(--muted); font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+    .nm-tags button:hover, .nm-tags button.on { color: var(--ink); border-color: var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); }
+    .nm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; position: sticky; bottom: -18px; padding: 10px 0 18px; margin-bottom: -18px; background: var(--panel); border-top: 1px solid var(--line); }   /* Save stays in reach while the log scrolls */
+    .nm-cancel, .nm-save { min-height: 48px; padding: 0 22px; border-radius: 6px; font-family: var(--font-display); font-weight: 500; font-size: 14px; letter-spacing: .16em; text-transform: uppercase; cursor: pointer; }
+    .nm-cancel { border: 1px solid var(--line); background: transparent; color: var(--muted); }
+    .nm-save { border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 16%, var(--panel)); color: var(--ink); }
+    .nm-card { max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; } .nm-card > * { flex-shrink: 0; }
+    .nm-auto { font-size: 10.5px; letter-spacing: .1em; color: var(--muted); line-height: 1.5; margin-top: -4px; }
+    #fieldLog { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    #fieldLog[hidden] { display: none; }
+    .fl { border-bottom: 1px solid var(--line); } .fl:last-child { border-bottom: none; }
+    .fl summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 46px; padding: 0 14px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+    .fl summary::-webkit-details-marker { display: none; }
+    .fl summary::after { content: '+'; color: var(--muted); font-size: 16px; } .fl[open] summary::after { content: '–'; }
+    .fl-n { flex: 1; text-align: right; color: var(--c); font-size: 10px; letter-spacing: .08em; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fl > :not(summary) { margin: 0 14px 12px; }
+    .fl-q { display: flex; flex-direction: column; gap: 7px; }
+    .fl-hint { font-size: 12px; line-height: 1.4; color: var(--muted); }
+    .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+    .seg button { min-height: 38px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line-strong); background: transparent; color: var(--muted); font: 500 13px var(--font-sans); cursor: pointer; }
+    .seg button.on { color: var(--ink); border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+    .fl-in { width: 100%; min-height: 42px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--bg); color: var(--ink); font: 16px var(--font-sans); }
+    .fl-in:focus, .fl-grid input:focus { outline: none; border-color: var(--c); }
+    .fl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+    .fl-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+    .fl-grid label span { display: flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--bg); padding-right: 10px; }
+    .fl-grid input { flex: 1; min-width: 0; min-height: 42px; padding: 0 10px; border: none; border-radius: 6px; background: transparent; color: var(--ink); font: 16px var(--font-mono); }
+    .fl-grid i { font: normal 11px var(--font-mono); color: var(--muted); }
+    .ex-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px dashed var(--line); font-size: 13px; color: var(--ink); }
+    .ex-row:last-child { border-bottom: none; }
+    .ex-row .seg button { min-height: 34px; min-width: 46px; padding: 0 8px; font: 500 10.5px var(--font-mono); letter-spacing: .08em; }
+    .ex-row .seg button.on[data-v="ABN"] { border-color: var(--high); background: color-mix(in srgb, var(--high) 14%, transparent); }
+    .detail-grid .val.log { font-size: 13px; line-height: 1.5; }
+    @keyframes nmIn { from { opacity: 0; transform: translateY(8px); } }
+    @media (max-width: 768px) { #noteModal { align-items: flex-start; padding: calc(12px + env(safe-area-inset-top)) 10px 10px; } .nm-actions > * { flex: 1; } }
+    @media (prefers-reduced-motion: reduce) { .nm-card { animation: none; } }
     /* [A.E.R.O. UI] after ENTER the dashboard boots in with a glitch: panels slice in, the map flickers on, a scan line runs down */
     body.aero-boot header, body.aero-boot .sidebar, body.aero-boot .map-floating-panel, body.aero-boot .map-legend, body.aero-boot #ht-dock, body.aero-boot .leaflet-control-zoom { animation: bootIn .75s steps(1, end) both; }
     body.aero-boot .sidebar { animation-delay: .12s; } body.aero-boot .map-floating-panel { animation-delay: .26s; } body.aero-boot .map-legend { animation-delay: .38s; }
@@ -391,6 +440,7 @@
       <span><svg class="lg-pin" viewBox="0 0 64 64" style="--c:var(--review)"><path d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/></svg>Review</span>
       <span><svg class="lg-pin" viewBox="0 0 64 64" style="--c:var(--reloc)"><path d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/></svg>Relocated</span>
       <span><svg class="lg-pin false" viewBox="0 0 64 64" style="--c:var(--false)"><path d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/></svg>False</span>
+      <span><span class="lg-dia"></span>Confirmed</span>
       <span class="lg-sep"></span>
       <span><span class="lg-sw" style="background:color-mix(in srgb,var(--high) 45%,transparent)"></span>Check inside fence</span>
       <span><span class="lg-sw" style="background:color-mix(in srgb,var(--reloc) 40%,transparent)"></span>Cover outside</span>
@@ -441,6 +491,7 @@
           <div><span class="lbl">Sensors</span><span class="val" id="detailSensors"></span></div>
           <div><span class="lbl">Species</span><span class="val" id="detailSpecies">Not confirmed</span></div>
           <div class="full"><span class="lbl">Last update</span><span class="val" id="detailUpdated">None yet</span></div>
+          <div class="full" id="detailLogRow" style="display:none"><span class="lbl">Field log</span><span class="val text log" id="detailLog"></span></div>
           <div class="full"><span class="lbl">Note</span><span class="val text" id="detailNote"></span></div>
         </div>
 
@@ -479,6 +530,58 @@
   </div>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
+
+<!-- [A.E.R.O. field] responder note: in-app sheet instead of the browser's prompt box -->
+<div id="noteModal" role="dialog" aria-modal="true" aria-labelledby="noteTitle" hidden>
+  <form class="nm-card" id="noteForm">
+    <div class="nm-head">
+      <span class="nm-chip" id="noteStatus">Relocated</span>
+      <button type="button" class="nm-x" onclick="closeNote(null)" aria-label="Cancel"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <h2 class="nm-title" id="noteTitle">Spot</h2>
+    <div class="nm-auto mono" id="logAuto"></div>
+    <!-- [A.E.R.O. field] field log: mirrors the A.E.R.O. Turtle Health Assessment sheet (sections 1-5); fill only what you saw -->
+    <div id="fieldLog">
+      <details class="fl" open><summary>Individual <span class="fl-n" data-sum="ind"></span></summary>
+        <div class="fl-q"><span class="lbl">Species</span><div class="seg" data-k="species" data-opts="Eastern box turtle|Other / uncertain"></div>
+          <input class="fl-in" data-k="species_other" placeholder="Which species, or why uncertain" hidden></div>
+        <div class="fl-q"><span class="lbl">Sex</span><div class="seg" data-k="sex" data-opts="Male|Female|Unknown|Not assessed"></div></div>
+        <div class="fl-q"><span class="lbl">Age class</span><div class="seg" data-k="age_class" data-opts="Adult|Subadult|Juvenile|Hatchling"></div></div>
+        <div class="fl-q"><span class="lbl">Measurements</span><div class="fl-grid">
+          <label>Mass<span><input type="number" inputmode="decimal" min="0" data-k="mass_g"><i>g</i></span></label>
+          <label>Carapace length<span><input type="number" inputmode="decimal" min="0" data-k="scl_mm"><i>mm</i></span></label>
+          <label>Carapace width<span><input type="number" inputmode="decimal" min="0" data-k="width_mm"><i>mm</i></span></label>
+          <label>Shell height<span><input type="number" inputmode="decimal" min="0" data-k="height_mm"><i>mm</i></span></label>
+          <label>Plastron length<span><input type="number" inputmode="decimal" min="0" data-k="plastron_mm"><i>mm</i></span></label>
+        </div></div>
+      </details>
+      <details class="fl"><summary>Encounter <span class="fl-n" data-sum="enc"></span></summary>
+        <div class="fl-q"><span class="lbl">Type</span><div class="seg" data-k="encounter_type" data-opts="Field capture|Found / in care|Rescue / transfer|Recapture / follow-up|Other"></div></div>
+        <div class="fl-q"><span class="lbl">Substrate / habitat</span><div class="seg" data-k="substrate" data-opts="Bare dirt|Leaf litter|Grass|Brush|Gravel|Along silt fence|Other"></div></div>
+        <div class="fl-q"><span class="lbl">Circumstances / activity</span><input class="fl-in" data-k="circumstances" placeholder="Walking the fence, buried, basking..."></div>
+      </details>
+      <details class="fl"><summary>Health check <span class="fl-n" data-sum="exam"></span></summary>
+        <p class="fl-hint">WNL = looks normal · ABN = abnormal, describe below · NE = not examined. Record what you see; don't diagnose.</p>
+        <div id="examRows"></div>
+        <div class="fl-q"><span class="lbl">Findings</span><input class="fl-in" data-k="findings" placeholder="Where, what it looks like, fresh or healing"></div>
+      </details>
+      <details class="fl"><summary>Photos <span class="fl-n" data-sum="photos"></span></summary>
+        <div class="seg multi" data-k="photos" data-opts="Dorsal shell|Plastron|Left side|Right side|Head / face|Lesion detail|ID card visible|Scale in frame"></div>
+      </details>
+      <details class="fl"><summary>Disposition <span class="fl-n" data-sum="disp"></span></summary>
+        <div class="seg" data-k="disposition" data-opts="Relocated off site|Released at site|Admitted to care|Transferred|Held for observation|Other"></div>
+        <input class="fl-in" data-k="disposition_location" placeholder="Where it went / who received it">
+      </details>
+    </div>
+    <label class="lbl" for="noteText">Field note</label>
+    <textarea id="noteText" rows="3" placeholder="What did you find? Size, sex, condition, where you moved it"></textarea>
+    <div class="nm-tags" id="noteTags"></div>
+    <div class="nm-actions">
+      <button type="button" class="nm-cancel" onclick="closeNote(null)">Cancel</button>
+      <button type="submit" class="nm-save" id="noteSave">Save</button>
+    </div>
+  </form>
+</div>
 
 <script>
   // [A.E.R.O. integration] use the server this page came from (works on localhost, a tunnel, or real hosting)
@@ -864,6 +967,8 @@
     document.getElementById('detailTime').innerText = whenText(alert.created_at);
     document.getElementById('detailCoords').innerText = `${alert.lat.toFixed(6)}, ${alert.lon.toFixed(6)}`;
     document.getElementById('detailSpecies').innerText = alert.species || 'Not confirmed';
+    const logTxt = logSummary(alert.record, alert);
+    document.getElementById('detailLogRow').style.display = logTxt ? '' : 'none'; document.getElementById('detailLog').innerText = logTxt;
     document.getElementById('detailNote').innerText = alert.note || 'No responder note yet';
 
     const badge = document.getElementById('detailConfidenceBadge');
@@ -928,13 +1033,16 @@
   async function updateAlertStatus(newStatus) {
     if (!activeAlert) return;
     const alertId = activeAlert.alert_id;
-    const note = prompt(`Enter responder field note for ${alertId}:`, activeAlert.note || '');
+    const log = await askNote(activeAlert, newStatus);
+    if (log === null) return;   // cancelled: nothing changes
+    const note = log.note, rec = log.record;
+    const species = rec ? (rec.species === 'Other / uncertain' ? (rec.species_other || 'Uncertain') : rec.species || '') : undefined;
 
     try {
       await fetch(`${API_BASE}/alerts/${alertId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, note: note || '', user: myName() })
+        body: JSON.stringify({ status: newStatus, note: note || '', user: myName(), ...(rec ? { species, sex: rec.sex || '', record: rec } : {}) })
       });
     } catch (e) {}
 
@@ -942,12 +1050,97 @@
     if (target) {
       target.status = newStatus;
       if (note !== null) target.note = note;
+      if (rec) Object.assign(target, { species, sex: rec.sex || '', record: rec });
     }
 
     renderAlertMarkers();
     renderAlertsList();
     openDetail(target);
   }
+
+  // in-app note sheet (replaces the browser prompt): resolves with the note, or null on Cancel / Esc / tapping outside
+  const NOTE_UI = {
+    relocated: { label: 'Relocated', c: '--reloc', tags: ['Let it walk off', 'Carried to cover', 'Faced away from site'] },
+    confirmed: { label: 'Confirmed turtle', c: '--high', tags: ['Left in place', 'Needs pickup', 'Let it walk off'] },
+    false_positive: { label: 'False alarm', c: '--false', tags: ['Rock', 'Leaf litter', 'Debris', 'Shadow', 'Nothing there'] },
+  };
+  let noteDone = null, logRec = {};
+  const EXAM = [['posture', 'Posture / response'], ['respiration', 'Respiration'], ['eyes', 'Eyes / eyelids'], ['nares', 'Nares / face'],
+                ['carapace', 'Carapace (top shell)'], ['plastron', 'Plastron (bottom shell)'], ['margins', 'Bridge / shell margins'],
+                ['skin', 'Skin / limbs / claws'], ['tail', 'Tail / cloaca'], ['parasites', 'Parasites / fly eggs'], ['gait', 'Gait / limb use']];
+  document.getElementById('examRows').innerHTML = EXAM.map(([k, l]) => `<div class="ex-row"><span>${l}</span><div class="seg" data-k="exam.${k}" data-opts="WNL|ABN|NE"></div></div>`).join('');
+  document.querySelectorAll('#noteModal .seg').forEach(g => {
+    g.innerHTML = g.dataset.opts.split('|').map(o => `<button type="button" data-v="${o}">${o}</button>`).join('');
+    g.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      const k = g.dataset.k, v = b.dataset.v;
+      if (g.classList.contains('multi')) { const set = new Set(logRec[k] || []); set.has(v) ? set.delete(v) : set.add(v); logRec[k] = [...set]; }
+      else setRec(k, getRec(k) === v ? '' : v);   // tap again to clear
+      paintLog();
+    });
+  });
+  document.querySelectorAll('#noteModal [data-k]:is(input)').forEach(i => i.addEventListener('input', () => { setRec(i.dataset.k, i.value.trim()); paintLog(true); }));
+  function getRec(k) { const [a, b] = k.split('.'); return b ? (logRec[a] || {})[b] || '' : logRec[a] ?? ''; }
+  function setRec(k, v) { const [a, b] = k.split('.'); if (b) { logRec[a] = { ...(logRec[a] || {}) }; v ? logRec[a][b] = v : delete logRec[a][b]; } else if (v === '' || v == null) delete logRec[a]; else logRec[a] = v; }
+  function paintLog(inputsOnly) {
+    const m = document.getElementById('noteModal');
+    if (!inputsOnly) {
+      m.querySelectorAll('.seg').forEach(g => g.querySelectorAll('button').forEach(b => b.classList.toggle('on', g.classList.contains('multi') ? (logRec[g.dataset.k] || []).includes(b.dataset.v) : getRec(g.dataset.k) === b.dataset.v)));
+      m.querySelectorAll('input[data-k]').forEach(i => { if (document.activeElement !== i) i.value = getRec(i.dataset.k); });
+      m.querySelector('[data-k="species_other"]').hidden = logRec.species !== 'Other / uncertain';
+    }
+    const ms = [['mass_g', 'g'], ['scl_mm', 'mm SCL']].filter(([k]) => logRec[k]).map(([k, u]) => logRec[k] + ' ' + u);
+    const ex = Object.values(logRec.exam || {}), abn = ex.filter(v => v === 'ABN').length;
+    const sums = { ind: [logRec.species === 'Other / uncertain' ? (logRec.species_other || 'Other') : logRec.species, logRec.sex, logRec.age_class, ...ms].filter(Boolean).join(' · '),
+                   enc: [logRec.encounter_type, logRec.substrate].filter(Boolean).join(' · '),
+                   exam: ex.length ? (abn ? `${abn} abnormal` : 'normal') + ` · ${ex.filter(v => v !== 'NE').length}/${EXAM.length} checked` : '',
+                   photos: (logRec.photos || []).length ? `${logRec.photos.length} checked` : '', disp: logRec.disposition || '' };
+    m.querySelectorAll('[data-sum]').forEach(el => { el.textContent = sums[el.dataset.sum]; });
+  }
+  // one line for the detail panel and the report: what the field log says about this turtle
+  function logSummary(r, a) {
+    if (!r || !Object.keys(r).length) return a && a.sex ? [a.sex].join('') : '';
+    const sp = r.species === 'Other / uncertain' ? (r.species_other || 'Species uncertain') : '';
+    const abn = Object.entries(r.exam || {}).filter(([, v]) => v === 'ABN').map(([k]) => (EXAM.find(e => e[0] === k) || [k, k])[1].split(' (')[0].toLowerCase());
+    return [sp, r.sex, r.age_class, r.scl_mm && `SCL ${r.scl_mm} mm`, r.mass_g && `${r.mass_g} g`, r.substrate && `found on ${r.substrate.toLowerCase()}`,
+            abn.length ? 'abnormal: ' + abn.join(', ') : Object.keys(r.exam || {}).length ? 'health check normal' : '', r.findings, r.disposition].filter(Boolean).join(' · ');
+  }
+  function askNote(alert, status) {
+    const ui = NOTE_UI[status] || { label: status, c: '--accent', tags: [] }, m = document.getElementById('noteModal'), t = document.getElementById('noteText');
+    const turtle = status !== 'false_positive';
+    m.querySelector('.nm-card').style.setProperty('--c', `var(${ui.c})`);
+    document.getElementById('noteStatus').textContent = ui.label;
+    document.getElementById('noteTitle').textContent = `(${alertNum(alert)}) ${alertName(alert)}`;
+    const now = new Date(), who = myName();
+    logRec = JSON.parse(JSON.stringify(alert.record || {}));
+    if (turtle) {   // section 1 basics the app already knows; the responder doesn't type these
+      if (!logRec.species && alert.species) logRec.species = /box/i.test(alert.species) ? 'Eastern box turtle' : 'Other / uncertain';
+      if (!logRec.species_other && alert.species && !/box/i.test(alert.species)) logRec.species_other = alert.species;
+      if (!logRec.sex && alert.sex) logRec.sex = alert.sex;
+      if (!logRec.encounter_type) logRec.encounter_type = 'Field capture';
+      if (status === 'relocated' && !logRec.disposition) logRec.disposition = 'Relocated off site';
+      if (status === 'relocated' && !logRec.disposition_location && lastRelocation && lastRelocation.alert_id === alert.alert_id)
+        logRec.disposition_location = `${lastRelocation.target_lat.toFixed(6)}, ${lastRelocation.target_lon.toFixed(6)} (${Math.round(lastRelocation.distance_m)} m ${compass(lastRelocation.bearing_deg)})`;
+    }
+    Object.assign(logRec, { date: now.toLocaleDateString('en-CA'), time: now.toTimeString().slice(0, 5), lat: alert.lat, lon: alert.lon,
+                            site: 'Grayson Overlook', county_state: 'Prince William County, VA', observer: who });
+    document.getElementById('logAuto').textContent = `${logRec.date} · ${logRec.time} · ${alert.lat.toFixed(5)}, ${alert.lon.toFixed(5)}${who ? ' · ' + who.toUpperCase() : ''}`;
+    document.getElementById('fieldLog').hidden = !turtle;
+    paintLog();
+    t.value = alert.note || '';
+    const tags = document.getElementById('noteTags'); tags.innerHTML = '';
+    ui.tags.forEach(tag => { const b = document.createElement('button'); b.type = 'button'; b.textContent = tag; b.classList.toggle('on', t.value.includes(tag));
+      b.onclick = () => { t.value = t.value.includes(tag) ? t.value.replace(new RegExp('(, )?' + tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '').replace(/^, /, '') : (t.value.trim() ? t.value.trim().replace(/[.,]$/, '') + ', ' : '') + tag; b.classList.toggle('on'); };
+      tags.appendChild(b); });
+    m.hidden = false; m.querySelector('.nm-card').scrollTop = 0;
+    if (!phoneView() && !turtle) setTimeout(() => t.focus(), 30);
+    return new Promise(res => { noteDone = res; }).then(note => note === null ? null : { note, record: turtle ? logRec : null });
+  }
+  function closeNote(v) { document.getElementById('noteModal').hidden = true; const d = noteDone; noteDone = null; d && d(v); }
+  document.getElementById('noteForm').addEventListener('submit', e => { e.preventDefault(); closeNote(document.getElementById('noteText').value.trim()); });
+  document.getElementById('noteModal').addEventListener('pointerdown', e => { if (e.target.id === 'noteModal') closeNote(null); });
+  document.getElementById('noteText').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); document.getElementById('noteForm').requestSubmit(); } });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && noteDone) closeNote(null); });
 
   function switchTab(tab) {
     document.getElementById('tabAlertsBtn').classList.toggle('active', tab === 'alerts');
