@@ -12,7 +12,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="A.E.R.O.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%2316A34A' d='M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z'/%3E%3Cpolygon fill='%23DCFCE7' points='32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0.2' y1='0' x2='0.6' y2='1'%3E%3Cstop offset='0' stop-color='%234ADE80'/%3E%3Cstop offset='0.55' stop-color='%2316A34A'/%3E%3Cstop offset='1' stop-color='%23052E16'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z'/%3E%3Cpath fill='none' stroke='%23052E16' stroke-opacity='.7' stroke-width='2' d='M32 19V4M41.5 24.5L55.5 17M41.5 35.5L53.4 42.4M32 41V60.3M22.5 24.5L8.5 17M22.5 35.5L10.6 42.4'/%3E%3Cpolygon fill='%23DCFCE7' stroke='%23052E16' stroke-width='1.6' points='32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5'/%3E%3C/svg%3E">
   <!-- [A.E.R.O. UI] pick the theme before first paint: saved choice, else dark on a laptop and light (field mode) on a phone -->
   <script>
     (function () { let t = null; try { t = localStorage.getItem('aero-theme'); } catch (e) {}
@@ -217,7 +217,8 @@
     .btn-relocated { --c: var(--reloc); } .btn-confirmed { --c: var(--review); } .btn-fp { --c: var(--false); }
 
     /* A.E.R.O. voice button: sits on the map, left of the zoom buttons */
-    html body #ht-dock { right: 484px; bottom: 20px; }
+    html body #ht-dock { right: 484px; bottom: 20px; flex-direction: column; align-items: flex-end; gap: 8px; }   /* CHAT sits above TAP TO TALK, clear of the legend */
+    .map-legend { max-width: calc(100% - 484px - 270px); }   /* the legend wraps before it reaches the voice button */
 
     /* sheet handles (phone): tap or drag down to see the whole map, tap or drag up to bring the sheet back */
     .sheet-handle { display: none; }
@@ -248,10 +249,24 @@
       .detail-header, .detail-body { padding-left: 16px; padding-right: 16px; }
       .detail-name { font-size: 24px; } .relocation-instruction { font-size: 19px; }
       .leaflet-control-zoom { display: none; }
-      html body #ht-dock { right: 14px; bottom: calc(48% + 14px); transition: bottom .25s ease; }
+      html body #ht-dock { right: 14px; bottom: calc(48% + 14px); transition: bottom .25s ease; flex-direction: column-reverse; align-items: center; }
       html body.sheet-down #ht-dock { bottom: calc(92px + env(safe-area-inset-bottom)); }
       html body.detail-open #ht-dock { bottom: auto; top: calc(70px + env(safe-area-inset-top)); right: auto; left: 12px; flex-direction: column; }
     }
+    /* [A.E.R.O. UI] after ENTER the dashboard boots in with a glitch: panels slice in, the map flickers on, a scan line runs down */
+    body.aero-boot header, body.aero-boot .sidebar, body.aero-boot .map-floating-panel, body.aero-boot .map-legend, body.aero-boot #ht-dock, body.aero-boot .leaflet-control-zoom { animation: bootIn .75s steps(1, end) both; }
+    body.aero-boot .sidebar { animation-delay: .12s; } body.aero-boot .map-floating-panel { animation-delay: .26s; } body.aero-boot .map-legend { animation-delay: .38s; }
+    body.aero-boot .leaflet-control-zoom { animation-delay: .46s; } body.aero-boot #ht-dock { animation-delay: .54s; }
+    body.aero-boot .brand h1 { animation: bootRgb .9s steps(1, end) .1s both; }
+    body.aero-boot #map { animation: bootMap .95s steps(1, end) both; }
+    body.aero-boot::before { content: ''; position: fixed; inset: 0; z-index: 15000; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(5,46,22,.28) 0 1px, transparent 1px 3px); animation: bootLines 1.3s ease-out both; }
+    body.aero-boot::after { content: ''; position: fixed; left: 0; right: 0; top: 0; height: 140px; z-index: 15001; pointer-events: none; background: linear-gradient(180deg, transparent, rgba(74,222,128,.10) 70%, rgba(74,222,128,.55) 97%, rgba(220,252,231,.9) 100%); animation: bootScan 1.1s cubic-bezier(.5,0,.6,1) .1s both; }
+    @keyframes bootIn { 0% { opacity: 0; transform: translateX(-12px); clip-path: inset(42% 0 44% 0); } 12% { opacity: 1; transform: translateX(8px) skewX(-8deg); clip-path: inset(8% 0 70% 0); } 24% { opacity: .3; transform: translateX(-6px); clip-path: inset(60% 0 6% 0); } 36% { opacity: 1; transform: translateX(4px); clip-path: inset(0 0 0 0); } 48% { opacity: .6; transform: translateX(-3px) skewX(5deg); clip-path: inset(28% 0 36% 0); } 62% { opacity: 1; transform: translateX(2px); clip-path: inset(0 0 0 0); } 76% { opacity: .85; transform: translateX(-1px); clip-path: inset(70% 0 0 0); } 88%, 100% { opacity: 1; transform: none; clip-path: none; } }
+    @keyframes bootMap { 0% { opacity: 0; } 10% { opacity: .7; filter: brightness(1.9) saturate(.4); clip-path: inset(22% 0 48% 0); transform: translateX(10px); } 20% { opacity: 0; } 32% { opacity: .85; filter: brightness(1.4); clip-path: inset(0 0 58% 0); transform: translateX(-8px); } 46% { opacity: 1; clip-path: inset(38% 0 0 0); transform: translateX(3px); } 60% { clip-path: none; transform: none; filter: brightness(1.25); } 72% { filter: brightness(.8); } 84%, 100% { opacity: 1; filter: none; clip-path: none; transform: none; } }
+    @keyframes bootRgb { 0% { text-shadow: -4px 0 rgba(74,222,128,.9), 4px 0 rgba(134,239,172,.7); } 25% { text-shadow: 3px 0 rgba(74,222,128,.8), -3px 0 rgba(134,239,172,.6); } 50% { text-shadow: -2px 0 rgba(74,222,128,.6), 2px 0 rgba(134,239,172,.4); } 75% { text-shadow: 1px 0 rgba(74,222,128,.4); } 100% { text-shadow: none; } }
+    @keyframes bootLines { 0% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes bootScan { 0% { transform: translateY(-140px); opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(100vh); opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { body.aero-boot *, body.aero-boot::before, body.aero-boot::after { animation: none !important; } body.aero-boot::before, body.aero-boot::after { display: none; } }
     @media (prefers-reduced-motion: reduce) { .live-dot, .pin.high::before, .pin.high::after { animation: none; } }
   </style>
 </head>
@@ -278,8 +293,8 @@
 <div class="app-root">
   <header>
     <div class="brand">
-      <svg class="brand-mark mark-dark" viewBox="0 0 64 64" aria-hidden="true"><path fill="url(#aeroGrad)" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><polygon fill="#DCFCE7" stroke="#052E16" stroke-width="1.6" stroke-linejoin="round" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>
-      <svg class="brand-mark mark-light" viewBox="0 0 64 64" aria-hidden="true"><path fill="none" stroke="#14532D" stroke-width="3" stroke-linejoin="round" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><polygon fill="url(#aeroGrad)" stroke="#14532D" stroke-width="2" stroke-linejoin="round" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>
+      <svg class="brand-mark mark-dark" viewBox="0 0 64 64" aria-hidden="true"><path fill="url(#aeroGrad)" stroke="#4ADE80" stroke-opacity=".45" stroke-width="1" stroke-linejoin="round" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><path fill="none" stroke="#052E16" stroke-opacity=".7" stroke-width="1.6" stroke-linecap="round" d="M32 19V4M41.5 24.5L55.5 17M41.5 35.5L53.4 42.4M32 41V60.3M22.5 24.5L8.5 17M22.5 35.5L10.6 42.4"/><polygon fill="#DCFCE7" stroke="#052E16" stroke-width="1.6" stroke-linejoin="round" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>
+      <svg class="brand-mark mark-light" viewBox="0 0 64 64" aria-hidden="true"><path fill="none" stroke="#14532D" stroke-width="3" stroke-linejoin="round" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><path fill="none" stroke="#14532D" stroke-width="2" stroke-linecap="round" d="M32 19V4M41.5 24.5L55.5 17M41.5 35.5L53.4 42.4M32 41V60.3M22.5 24.5L8.5 17M22.5 35.5L10.6 42.4"/><polygon fill="url(#aeroGrad)" stroke="#14532D" stroke-width="2" stroke-linejoin="round" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>
       <h1>A.E.R.O.</h1>
       <span class="brand-sub">Field system · W.A. Hazel × Aero Animal Rescue</span>
     </div>
