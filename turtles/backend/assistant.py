@@ -18,6 +18,7 @@ Mount in Ethan's API later:   app.include_router(assistant.router(store))
 """
 from __future__ import annotations
 
+import time
 import argparse, json, os, re
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +42,14 @@ How to answer:
   "false_positive" when they say nothing is there. Never infer a status. If they say "next" while the current alert is
   still open, first ask one short question: did they move it, or was it a false alarm?
 - "Next" means the next open alert: use list_alerts and tell them its name.
+- Never say you logged, recorded, marked or saved anything unless you called update_alert in this same turn, and don't
+  talk about logging at all unless you just logged something or they asked.
+- You can press the app's buttons with control_app (zoom, my location, open an alert, Site boundary and Fence band
+  buttons, tabs, theme, navigation). When asked, do it and say what you did in a few words.
+- You cannot see the screen except through [Screen now: ...]. Never say something is on, off or shown unless that
+  line says so or you just changed it with control_app.
+- "Take me to / guide me to / navigate to" a spot means control_app navigate: the app draws the walking line from their
+  GPS position and tracks them there. Distances in [Screen now] are live from their GPS.
 - Refer to alerts only by spot number and name (for example "Spot 2, the rut"). Never say internal ids like pin-2.
 - Handling rules from Tanya Finch (What About the Turtles): hold a box turtle by the sides with a hand under the
   bottom of the shell, "like a hamburger", upright, never upside down. Snapping turtles, or any turtle that cannot
@@ -67,6 +76,20 @@ TOOLS = [
          "sex": {"type": "string", "enum": ["Male", "Female", "Unknown"]},
          "est_length_in": {"type": "number", "description": "approximate shell length in inches"},
          "note": {"type": "string"}}}},
+    {"name": "control_app", "description": "Do something on the person's screen right now, the same as pressing the button: "
+     "zoom the map in or out, recenter on the site, show their own location, open or close an alert's details, press the "
+     "Site boundary or Fence band (heat map) buttons, switch the Alerts / Flight windows tab, filter alerts, switch dark or "
+     "light theme, slide the alert list or chat away, or start / stop walking navigation to an alert (in the app, from "
+     "their GPS position). Use it whenever they ask to see, show, open, zoom, switch, hide, press, take them to or guide "
+     "them somewhere. Several calls in one turn are fine.",
+     "input_schema": {"type": "object", "required": ["action"], "properties": {
+         "action": {"type": "string", "enum": ["zoom_in", "zoom_out", "recenter", "locate", "open_alert", "close_alert", "layer",
+                                              "tab", "filter", "theme", "list", "chat", "navigate", "stop_navigation"]},
+         "alert_id": {"type": "string", "description": "for open_alert and navigate"},
+         "value": {"type": "string", "description": "layer: boundary_on, boundary_off, boundary_toggle, fence_on, fence_off or "
+                   "fence_toggle (the fence band is the heat map; the boundary is the site outline); tab: alerts or "
+                   "flights; filter: all, open or resolved; theme: dark or light; list: up or down; chat: hide; "
+                   "zoom_in / zoom_out: how many steps (default 1)"}}}},
     {"name": "survey_progress", "description": "Counts of open, confirmed, relocated and false-alarm alerts.",
      "input_schema": {"type": "object", "properties": {}}},
     {"name": "get_flight_plan", "description": "Recommended upcoming drone flight windows from the planner.",
@@ -77,8 +100,30 @@ TOOLS = [
 class AlertStore:
     """In-memory alerts. Ethan: subclass with SQLite and keep these four methods."""
     def __init__(self, alerts: List[Dict[str, Any]]):
+        self.version, self.last, self.actor = 0, {"version": 0}, ""   # bumped on every change, so other phones/laptops refresh
         self.alerts = {a["alert_id"]: a for a in alerts}
         self._cells = None
+        self.state_path: Optional[Path] = None
+
+    KEEP = ("status", "species", "sex", "est_length_in", "notes", "note", "updated_at", "updated_by")
+
+    def load_state(self, path, reset: bool = False):
+        """Field changes survive a restart: kept in <pack>_state.json beside the pack (private data, not in git)."""
+        self.state_path = Path(path)
+        if reset and self.state_path.exists(): self.state_path.unlink(); print("A.E.R.O.: cleared saved alert changes")
+        if self.state_path.exists():
+            for k, v in json.loads(self.state_path.read_text()).items():
+                if k in self.alerts: self.alerts[k].update(v)
+            print(f"A.E.R.O.: restored saved alert changes from {self.state_path.name}")
+        return self
+
+    def save(self):
+        if not self.state_path: return
+        try:
+            tmp = self.state_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps({k: {f: a.get(f) for f in self.KEEP if f in a} for k, a in self.alerts.items()}, indent=1))
+            tmp.replace(self.state_path)
+        except Exception as e: print(f"  (couldn't save alert changes: {e})")
 
     @classmethod
     def from_pack(cls, path) -> "AlertStore":
@@ -114,7 +159,16 @@ class AlertStore:
         note = fields.pop("note", None)
         if note: a["notes"].append(note)
         a.update({k: v for k, v in fields.items() if v not in (None, "")})
-        a["updated_at"] = datetime.now().strftime("%H:%M")
+        return self.touch(a)
+
+    def touch(self, a: Dict[str, Any], by: str = "") -> Dict[str, Any]:
+        """Record that an alert changed and who changed it (the name typed on the sign-in page)."""
+        by = (by or self.actor or "").strip()[:24]
+        a["updated_at"] = datetime.now().strftime("%H:%M"); a["updated_by"] = by
+        self.version += 1
+        self.last = {"version": self.version, "alert_id": a["alert_id"], "label": a.get("name") or a["alert_id"],
+                     "status": a["status"], "by": by, "at": a["updated_at"]}
+        self.save()
         return a
 
     def relocation(self, alert_id: str, species: str = "box") -> Optional[Dict[str, Any]]:
@@ -143,6 +197,12 @@ def run_tool(store: AlertStore, name: str, args: Dict[str, Any]) -> Dict[str, An
     if name == "update_alert":
         a = store.update(**args)
         return public(a) if a else {"error": "no such alert"}
+    if name == "control_app":
+        if args.get("action") in ("open_alert", "navigate"):
+            a = store.get(args.get("alert_id", ""))
+            if a is None: return {"error": "no such alert"}
+            args["alert_id"] = a["alert_id"]
+        return {"ok": True, "done": "shown on the person's screen"}
     if name == "survey_progress":
         al = store.list(); return {s: sum(a["status"] == s for a in al) for s in STATUSES} | {"total": len(al)}
     if name == "get_flight_plan":
@@ -167,13 +227,16 @@ def clean_history(history: List[Dict[str, Any]], keep: int = 8) -> List[Dict[str
     return out
 
 
+FAST_NOTE = ("\n- Speed matters: each message starts with [Alerts now: ...], the live list. Answer questions about which alerts "
+             "exist or are open straight from it; don't call list_alerts or survey_progress for that.")
 THINKING_OFF = {"type": "disabled"}   # voice needs fast answers; set None if a model rejects this setting
 
 
 def create(client, messages, max_tokens: int = 1024):
     """One Messages API call. Thinking off for speed; if the model refuses that setting, retry without it."""
     global THINKING_OFF
-    kw = dict(model=MODEL, max_tokens=max_tokens, system=SYSTEM, tools=TOOLS, messages=messages)
+    kw = dict(model=MODEL, max_tokens=max_tokens, tools=TOOLS, messages=messages,
+              system=[{"type": "text", "text": SYSTEM + FAST_NOTE, "cache_control": {"type": "ephemeral"}}])
     if THINKING_OFF:
         try:
             return client.messages.create(**kw, thinking=THINKING_OFF)
@@ -183,18 +246,27 @@ def create(client, messages, max_tokens: int = 1024):
     return client.messages.create(**kw)
 
 
-def ask_claude(store: AlertStore, text: str, alert_id: Optional[str], history: List[Dict[str, str]], client=None):
+def screen_text(screen: Optional[Dict[str, Any]]) -> str:
+    """What the person's screen shows right now (sent by the app with every message), so A.E.R.O. never guesses."""
+    if not screen: return ""
+    return "[Screen now: " + "; ".join(f"{k.replace('_', ' ')}: {v}" for k, v in screen.items() if v not in (None, "")) + "] "
+
+
+def ask_claude(store: AlertStore, text: str, alert_id: Optional[str], history: List[Dict[str, str]], client=None,
+               screen: Optional[Dict[str, Any]] = None):
     """Tool-use loop. Returns (reply, actions)."""
     if client is None:
         import anthropic
         client = anthropic.Anthropic()
     cur = store.get(alert_id) if alert_id else None
     context = f"[The person is at alert #{cur['number']} ({cur['alert_id']}): {cur['name']}, status {cur['status']}.] " if cur else ""
+    context = "[Alerts now: " + "; ".join(f"#{a.get('number')} {a.get('name') or a['alert_id']} ({a['alert_id']}): {a['status']}"
+                                         + (f", {a['species']}" if a.get("species") else "") for a in store.list()) + "] " + screen_text(screen) + context
     messages = [*clean_history(history), {"role": "user", "content": context + text}]
-    actions = []
+    actions, checked = [], False
     for _ in range(6):
-        r = create(client, messages)
-        print(f"  claude: stop={r.stop_reason} blocks={[b.type for b in r.content]}")
+        t0 = time.time(); r = create(client, messages)
+        print(f"  claude: {time.time() - t0:.2f}s stop={r.stop_reason} blocks={[b.type for b in r.content]}")
         uses = [b for b in r.content if b.type == "tool_use"]
         if uses and r.stop_reason != "max_tokens":
             messages.append({"role": "assistant", "content": r.content})
@@ -205,6 +277,15 @@ def ask_claude(store: AlertStore, text: str, alert_id: Optional[str], history: L
             messages.append({"role": "user", "content": results})
             continue
         text = " ".join(b.text for b in r.content if b.type == "text").strip()
+        if text and not uses and not checked and re.search(r"^(?:logged|recorded|marked|saved)\b|\bI(?:'ve| have| just)?\s+(?:logged|recorded|marked|saved)\b", text, re.I) \
+                and not any(x["tool"] == "update_alert" for x in actions):
+            # it claimed a log without calling the tool: make it actually do it (or take it back) before the person hears it
+            checked = True; print("  claude claimed a log without update_alert -> asking it to do it")
+            messages += [{"role": "assistant", "content": r.content},
+                         {"role": "user", "content": "[Check: you said you logged or recorded something, but you did not call "
+                          "update_alert in this turn. If the person asked you to record something, call update_alert now and then "
+                          "confirm. If not, answer again without claiming you logged anything.]"}]
+            continue
         if text and not uses: return text, actions
         # cut off (or no words): never send a half-finished tool call back; ask again with room to answer
         r2 = create(client, messages, max_tokens=1500)
@@ -252,11 +333,12 @@ def offline(store: AlertStore, text: str, alert_id: Optional[str]):
     return "I'm in offline mode. Try: where do I take it, relocated, false alarm, next, or how many left.", acts
 
 
-def respond(store: AlertStore, text: str, alert_id: Optional[str] = None, history=None, client=None) -> Dict[str, Any]:
+def respond(store: AlertStore, text: str, alert_id: Optional[str] = None, history=None, client=None,
+            screen: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     history = history or []
     try:
         if client is None and not os.environ.get("ANTHROPIC_API_KEY"): raise RuntimeError("no key")
-        reply, actions = ask_claude(store, text, alert_id, history, client); mode = "claude"
+        reply, actions = ask_claude(store, text, alert_id, history, client, screen); mode = "claude"
     except Exception as e:  # no key, no internet, API error -> keep working
         print(f"  claude unavailable -> offline: {type(e).__name__}: {str(e)[:300]}")
         reply, actions = offline(store, text, alert_id); mode = f"offline ({type(e).__name__})"
@@ -264,7 +346,14 @@ def respond(store: AlertStore, text: str, alert_id: Optional[str] = None, histor
     focus = next((x["input"].get("alert_id") for x in reversed(actions) if x["input"].get("alert_id")), alert_id)
     f = store.get(focus) if focus else None
     return {"reply": reply, "mode": mode, "actions": actions, "alert_id": f["alert_id"] if f else alert_id,
-            "alerts_changed": any(x["tool"] == "update_alert" for x in actions)}
+            "alerts_changed": any(x["tool"] == "update_alert" for x in actions),
+            "ui": [ui_cmd(store, x["input"]) for x in actions if x["tool"] == "control_app"]}   # the widget carries these out on screen
+
+
+def ui_cmd(store: AlertStore, cmd: Dict[str, Any]) -> Dict[str, Any]:
+    """A control_app call as the widget gets it: "2" or "spot 2" becomes the real alert id."""
+    a = store.get(cmd["alert_id"]) if cmd.get("alert_id") else None
+    return {**cmd, "alert_id": a["alert_id"]} if a else dict(cmd)
 
 
 try:  # request body for POST /assistant; module level so FastAPI can resolve the type
@@ -274,12 +363,48 @@ try:  # request body for POST /assistant; module level so FastAPI can resolve th
         text: str
         alert_id: Optional[str] = None
         history: List[Dict[str, Any]] = []
+        screen: Optional[Dict[str, Any]] = None   # what the phone shows right now (layers on/off, open spot, GPS distance)
+        user: str = ""   # who is talking (shown as "NAZ: ..." in the chat, saved with any alert they change)
+
+    class Patch(BaseModel):   # PATCH /alerts/{id}; module level for the same reason (inside a function it became a query param -> 422)
+        status: Optional[str] = None
+        note: Optional[str] = None
+        user: Optional[str] = None
 except ImportError:  # tests and offline use don't need pydantic
-    Ask = None
+    Ask = Patch = None
 
 
 ELEVEN_VOICE = os.environ.get("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")   # any voice id from your ElevenLabs account
-ELEVEN_MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_multilingual_v2")
+ELEVEN_MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_flash_v2_5")   # ~75 ms model; multilingual_v2 sounds a bit richer but is several times slower
+
+
+def tts_stream(text: str):
+    """Start ElevenLabs streaming. Returns (chunks, None) or (None, why). The phone starts playing the first chunk
+    while the rest is still being generated, instead of waiting for the whole file."""
+    key = os.environ.get("ELEVENLABS_API_KEY")
+    if not key: return None, "no ELEVENLABS_API_KEY on the server"
+    if not text.strip(): return None, "empty text"
+    import urllib.request
+    req = urllib.request.Request(f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVEN_VOICE}/stream?output_format=mp3_22050_32",
+        method="POST", headers={"xi-api-key": key, "Content-Type": "application/json", "Accept": "audio/mpeg"},
+        data=json.dumps({"text": text[:800], "model_id": ELEVEN_MODEL,
+                         "voice_settings": {"stability": 0.45, "similarity_boost": 0.8}}).encode())
+    t0 = time.time()
+    try: r = urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        body = e.read().decode(errors="ignore")[:300] if hasattr(e, "read") else ""
+        why = f"{e} {body}".strip(); print(f"  voice: ElevenLabs FAILED -> browser voice. {why}"); return None, why
+
+    def chunks():
+        n, first = 0, True
+        with r:
+            while True:
+                c = r.read(4096)
+                if not c: break
+                if first: print(f"  voice: ElevenLabs first audio after {time.time() - t0:.2f}s"); first = False
+                n += len(c); yield c
+        print(f"  voice: ElevenLabs done ({n // 1024} KB in {time.time() - t0:.1f}s)")
+    return chunks(), None
 
 
 def tts_mp3(text: str) -> Optional[bytes]:
@@ -303,13 +428,23 @@ def router(store: AlertStore):
     from fastapi import APIRouter, Response
     r = APIRouter()
 
+    @r.get("/assistant/speak.mp3")   # streamed voice: the widget points an <audio> at this URL
+    def speak_stream(text: str):
+        from fastapi.responses import StreamingResponse
+        it, why = tts_stream(text)
+        if it is None: return Response(status_code=503, headers={"X-Voice-Error": why.encode("ascii", "ignore").decode()[:200]})
+        return StreamingResponse(it, media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
+
     @r.post("/assistant/speak")
     def speak(q: Ask):
         mp3 = tts_mp3(q.text)
         return Response(content=mp3, media_type="audio/mpeg") if mp3 else Response(status_code=204)
 
     @r.post("/assistant")
-    def assistant(q: Ask): return respond(store, q.text, q.alert_id, q.history)
+    def assistant(q: Ask):
+        store.actor = q.user; t0 = time.time()
+        try: return respond(store, q.text, q.alert_id, q.history, screen=q.screen)
+        finally: store.actor = ""; print(f"  reply ready in {time.time() - t0:.2f}s")
 
     @r.get("/assistant/alerts")
     def alerts(): return [public(a) for a in store.list()]
@@ -328,7 +463,7 @@ def as_contract(a: Dict[str, Any]) -> Dict[str, Any]:
             "sensors": a.get("sensors", ["rgb"]), "detection_ids": a.get("detection_ids", []), "thumbnail": a.get("thumbnail", ""),
             "created_at": a.get("created_at", "2026-10-24T15:00:00Z"), "status": a["status"],
             "note": a.get("note") or " · ".join(x for x in parts if x), "number": a.get("number"), "species": a.get("species", ""),
-            "label": a.get("name") or a["alert_id"]}
+            "label": a.get("name") or a["alert_id"], "updated_at": a.get("updated_at", ""), "updated_by": a.get("updated_by", "")}
 
 
 _heat_cache: Dict[str, Any] = {}
@@ -340,14 +475,13 @@ def app_router(store: AlertStore, mock_zones: bool):
     from fastapi import APIRouter, HTTPException
     from pydantic import BaseModel
 
-    class Patch(BaseModel):
-        status: Optional[str] = None
-        note: Optional[str] = None
-
     r = APIRouter(); mock = ROOT / "architecture" / "mock"
 
     @r.get("/alerts")
     def alerts(): return [as_contract(a) for a in store.list()]
+
+    @r.get("/alerts/changes")   # tiny poll: every open phone/laptop checks this and reloads when the version moves
+    def changes(): return store.last
 
     @r.get("/alerts/{alert_id}/relocation")
     def relocation(alert_id: str):
@@ -362,7 +496,7 @@ def app_router(store: AlertStore, mock_zones: bool):
         if a is None: raise HTTPException(404, "no such alert")
         if p.status in STATUSES: a["status"] = p.status
         if p.note is not None: a["note"] = p.note
-        a["updated_at"] = datetime.now().strftime("%H:%M")
+        store.touch(a, p.user or "")
         return as_contract(a)
 
     @r.get("/zones")
@@ -420,22 +554,123 @@ def create_app(store: AlertStore, mock_zones: bool = False):
     from fastapi.responses import FileResponse
     app = FastAPI(title="A.E.R.O. field assistant")
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+    @app.middleware("http")
+    async def no_stale(request, call_next):   # phones must never show an old page or old alert list
+        r = await call_next(request)
+        if request.url.path in ("/", "/hey-turtle.js", "/loading.js"): r.headers["Cache-Control"] = "no-cache"
+        elif r.headers.get("content-type", "").startswith("application/json"): r.headers["Cache-Control"] = "no-store"
+        return r
+
+    password = os.environ.get("TURTLE_APP_PASSWORD")
+    if password:  # required before sharing a public link: site locations + paid API keys sit behind this server
+        # A login page + 30-day cookie (an iPhone home screen app can't show the browser's password box),
+        # and HTTP Basic still works for scripts. Icons/manifest stay open so iOS can fetch the app icon.
+        import base64, hashlib, hmac, secrets
+        from urllib.parse import parse_qs, quote
+        from fastapi import Request
+        from fastapi.responses import Response as Plain, HTMLResponse, RedirectResponse
+        token = hmac.new(password.encode(), b"aero-session-v1", hashlib.sha256).hexdigest()
+        public = ("/login", "/manifest.webmanifest", "/apple-touch-icon", "/icons/", "/fonts/", "/favicon")
+
+        def authed(request: Request) -> bool:
+            if secrets.compare_digest(request.cookies.get("aero_session", ""), token): return True
+            auth = request.headers.get("authorization", "")
+            try: given = base64.b64decode(auth.split(" ", 1)[1]).decode().split(":", 1)[1] if auth.startswith("Basic ") else ""
+            except Exception: given = ""
+            return bool(given) and secrets.compare_digest(given, password)
+
+        @app.middleware("http")
+        async def require_password(request: Request, call_next):
+            if request.url.path.startswith(public) or authed(request):
+                return await call_next(request)
+            if request.method == "GET" and "text/html" in request.headers.get("accept", ""):
+                return RedirectResponse("/login", status_code=303)
+            return Plain(status_code=401)
+
+        @app.get("/login", response_class=HTMLResponse)
+        def login_page(): return LOGIN_HTML.replace("{msg}", "")
+
+        async def login(request):
+            form = parse_qs((await request.body()).decode())
+            given, name = form.get("password", [""])[0], " ".join(form.get("name", [""])[0].split())[:24]
+            if not secrets.compare_digest(given, password):
+                return HTMLResponse(LOGIN_HTML.replace("{msg}", "Wrong password. Try again."), status_code=401)
+            r = RedirectResponse("/", status_code=303)
+            r.set_cookie("aero_session", token, max_age=30 * 86400, httponly=True, samesite="lax",
+                         secure=request.headers.get("x-forwarded-proto", request.url.scheme) == "https")
+            if name: r.set_cookie("aero_name", quote(name), max_age=30 * 86400, samesite="lax")   # display name only, not a secret
+            return r
+        login.__annotations__["request"] = Request   # real class, not the string the __future__ import makes
+        app.post("/login")(login)
     app.include_router(router(store))
     app.include_router(app_router(store, mock_zones))
     ui = ROOT / "ui_docs"
     app.get("/")(lambda: FileResponse(ui / "index.html"))                  # Huy's responder app, A.E.R.O. built in
     app.get("/demo")(lambda: FileResponse(ui / "hey_turtle_demo.html"))    # bare A.E.R.O. test page
     app.get("/hey-turtle.js")(lambda: FileResponse(ui / "hey-turtle.js", media_type="text/javascript"))
+    app.get("/loading.js")(lambda: FileResponse(ui / "loading.js", media_type="text/javascript"))   # A.E.R.O. loading screen
+    # home screen app: icon + manifest (public, so iOS can fetch the icon)
+    app.get("/manifest.webmanifest")(lambda: FileResponse(ui / "manifest.webmanifest", media_type="application/manifest+json"))
+    app.get("/apple-touch-icon.png")(lambda: FileResponse(ui / "icons" / "apple-touch-icon.png", media_type="image/png"))
+
+    @app.get("/icons/{name}")
+    def icon(name: str):
+        f = ui / "icons" / name
+        if f.suffix != ".png" or f.parent != ui / "icons" or not f.is_file():
+            from fastapi import HTTPException
+            raise HTTPException(404)
+        return FileResponse(f, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
+
+    @app.get("/fonts/{name}")   # bundled fonts, so the demo doesn't need venue Wi-Fi for type
+    def font(name: str):
+        f = ui / "fonts" / name
+        if f.suffix != ".woff2" or f.parent != ui / "fonts" or not f.is_file():
+            from fastapi import HTTPException
+            raise HTTPException(404)
+        return FileResponse(f, media_type="font/woff2", headers={"Cache-Control": "public, max-age=604800"})
     return app
+
+
+LOGIN_HTML = """<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>A.E.R.O. sign in</title><meta name="theme-color" content="#0A140D">
+<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="A.E.R.O.">
+<style>
+@font-face{font-family:Oxanium;font-weight:300;src:url(/fonts/oxanium-latin-300-normal.woff2) format('woff2')}
+@font-face{font-family:Oxanium;font-weight:500;src:url(/fonts/oxanium-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-weight:500;src:url(/fonts/jetbrains-mono-latin-500-normal.woff2) format('woff2')}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:#0A140D;color:#E6EDE7;font-family:Oxanium,-apple-system,sans-serif}
+body{display:flex;align-items:center;justify-content:center;padding:24px}
+form{width:min(340px,100%);display:flex;flex-direction:column;align-items:center;gap:18px}
+h1{margin:0;font-weight:300;font-size:44px;letter-spacing:.04em}
+.mono{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.18em;color:#9FB3A5;text-transform:uppercase}
+input{width:100%;height:52px;border-radius:6px;border:1px solid #1C2E21;background:#050B07;color:#E6EDE7;padding:0 14px;font-size:17px}
+input:focus{outline:2px solid #4ADE80;outline-offset:1px}
+button{width:100%;height:52px;border-radius:6px;border:1px solid #4ADE80;background:#16A34A;color:#04140A;font:500 16px Oxanium,sans-serif;letter-spacing:.24em;cursor:pointer}
+.err{color:#F87171;min-height:1em}
+</style></head><body>
+<form method="post" action="/login">
+<svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1=".2" y1="0" x2=".6" y2="1"><stop offset="0" stop-color="#4ADE80"/><stop offset=".55" stop-color="#16A34A"/><stop offset="1" stop-color="#052E16"/></linearGradient></defs><path fill="url(#g)" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><polygon fill="#DCFCE7" stroke="#052E16" stroke-width="1.6" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>
+<h1>A.E.R.O.</h1><span class="mono">What About the Turtles · Field system</span>
+<input type="text" name="name" placeholder="Your name" autocomplete="nickname" maxlength="24" autofocus required>
+<input type="password" name="password" placeholder="Team password" autocomplete="current-password" required>
+<button type="submit">SIGN IN</button><span class="mono err">{msg}</span>
+</form></body></html>"""
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="A.E.R.O. voice assistant server")
     ap.add_argument("--pack", help="relocation pack JSON (real pins)"); ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--reset", action="store_true", help="forget saved field changes (fresh demo)")
     a = ap.parse_args()
     store = AlertStore.from_pack(a.pack) if a.pack else AlertStore.from_alerts(ROOT / "architecture" / "mock" / "alerts.json")
+    if a.pack: store.load_state(Path(a.pack).with_name(Path(a.pack).stem + "_state.json"), reset=a.reset)
     import uvicorn
     print(f"A.E.R.O.: {len(store.alerts)} alerts, model {MODEL}, "
           f"{'Claude' if os.environ.get('ANTHROPIC_API_KEY') else 'OFFLINE mode (no ANTHROPIC_API_KEY)'}, "
-          f"voice: {'ElevenLabs' if os.environ.get('ELEVENLABS_API_KEY') else 'browser'} -> app http://localhost:{a.port}  (bare test page: /demo)")
+          f"voice: {'ElevenLabs' if os.environ.get('ELEVENLABS_API_KEY') else 'browser'}, "
+          f"password: {'ON' if os.environ.get('TURTLE_APP_PASSWORD') else 'OFF (set TURTLE_APP_PASSWORD before sharing a link)'} "
+          f"-> app http://localhost:{a.port}  (bare test page: /demo)")
     uvicorn.run(create_app(store, mock_zones=not a.pack), host="0.0.0.0", port=a.port)
