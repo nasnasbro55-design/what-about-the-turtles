@@ -1,395 +1,295 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>What About the Turtles | Responder Map & Alert Dashboard</title>
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>A.E.R.O. | What About the Turtles field system</title>
+  <meta name="theme-color" content="#0A140D">
+  <!-- [A.E.R.O. UI] home screen app: shield icon, full screen, A.E.R.O. name -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="A.E.R.O.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%2316A34A' d='M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z'/%3E%3Cpolygon fill='%23DCFCE7' points='32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5'/%3E%3C/svg%3E">
+  <!-- [A.E.R.O. UI] pick the theme before first paint: saved choice, else dark on a laptop and light (field mode) on a phone -->
+  <script>
+    (function () { let t = null; try { t = localStorage.getItem('aero-theme'); } catch (e) {}
+      document.documentElement.dataset.theme = t === 'light' || t === 'dark' ? t : (matchMedia('(max-width: 768px)').matches ? 'light' : 'dark'); })();
+  </script>
+
   <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+  <!-- [A.E.R.O. UI] loading screen (canvas artboard 07) -->
+  <script src="loading.js"></script>
 
   <style>
-    :root {
-      --primary: #15803d;
-      --primary-dark: #166534;
-      --bg-dark: #0f172a;
-      --bg-card: #ffffff;
-      --text-main: #0f172a;
-      --text-muted: #64748b;
-      --border: #e2e8f0;
-      
-      --color-high: #dc2626;
-      --color-review: #d97706;
-      --color-closed: #64748b;
-      --color-relocated: #16a34a;
-      
+    /* [A.E.R.O. UI] fonts bundled in ./fonts so the demo doesn't need venue Wi-Fi for type (OFL licenses in that folder) */
+    @font-face { font-family: 'Oxanium'; font-weight: 300; font-display: swap; src: url(fonts/oxanium-latin-300-normal.woff2) format('woff2'); }
+    @font-face { font-family: 'Oxanium'; font-weight: 500; font-display: swap; src: url(fonts/oxanium-latin-500-normal.woff2) format('woff2'); }
+    @font-face { font-family: 'JetBrains Mono'; font-weight: 500; font-display: swap; src: url(fonts/jetbrains-mono-latin-500-normal.woff2) format('woff2'); }
+    @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url(fonts/inter-latin-400-normal.woff2) format('woff2'); }
+    @font-face { font-family: 'Inter'; font-weight: 500; font-display: swap; src: url(fonts/inter-latin-500-normal.woff2) format('woff2'); }
+    @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url(fonts/inter-latin-600-normal.woff2) format('woff2'); }
+
+    /* [A.E.R.O. UI] theme tokens. Dark = command center (laptop, pitch). Light = field mode (phone, direct sun). */
+    :root, :root[data-theme="dark"] {
+      --bg: #0A140D; --panel: #0F1D14; --panel-2: #050B07; --line: #1C2E21; --line-strong: #2B4433;
+      --ink: #E6EDE7; --muted: #9FB3A5; --accent: #4ADE80; --accent-text: #4ADE80; --accent-soft: rgba(74,222,128,.10);
+      --high: #F87171; --review: #FBBF24; --reloc: #4ADE80; --false: #6B7C70; --on-pin: #0A140D;
+      --shadow: 0 10px 28px rgba(0,0,0,.45); --map-bg: #0C1910;
       --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+      --font-display: 'Oxanium', 'Inter', sans-serif;
+      color-scheme: dark;
+    }
+    :root[data-theme="light"] {
+      --bg: #EEF3EF; --panel: #FFFFFF; --panel-2: #F6F9F6; --line: #CFDCD2; --line-strong: #B5C7B9;
+      --ink: #052E16; --muted: #4B5F52; --accent: #16A34A; --accent-text: #14532D; --accent-soft: rgba(22,163,74,.10);
+      --high: #B91C1C; --review: #B45309; --reloc: #15803D; --false: #6B7280; --on-pin: #FFFFFF;
+      --shadow: 0 8px 22px rgba(5,46,22,.10); --map-bg: #E4EBE3;
+      color-scheme: light;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body, html { width: 100%; height: 100%; font-family: var(--font-sans); color: var(--text-main); background: #f8fafc; overflow: hidden; }
+    body, html { width: 100%; height: 100%; font-family: var(--font-sans); color: var(--ink); background: var(--bg); overflow: hidden; -webkit-font-smoothing: antialiased; }
+    button { font: inherit; color: inherit; }
+    button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .mono { font-family: var(--font-mono); letter-spacing: .14em; text-transform: uppercase; }
+    .icon { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 
-    .app-root { display: flex; flex-direction: column; width: 100vw; height: 100vh; }
-    
+    .app-root { display: flex; flex-direction: column; width: 100vw; height: 100vh; height: 100dvh; }
+
+    /* Header */
     header {
-      background: var(--bg-dark);
-      color: #fff;
-      padding: 0.75rem 1.25rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      z-index: 1000;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      height: calc(64px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); flex-shrink: 0; padding-left: 20px; padding-right: 20px; display: flex; justify-content: space-between; align-items: center; gap: 16px;
+      background: var(--panel-2); border-bottom: 1px solid var(--line); z-index: 1000;
     }
-    
-    .brand { display: flex; align-items: center; gap: 0.6rem; }
-    .brand-icon { font-size: 1.5rem; }
-    .brand h1 { font-size: 1.125rem; font-weight: 800; letter-spacing: -0.01em; }
-    .brand span { font-size: 0.75rem; color: #94a3b8; display: block; font-weight: 500; }
-    
-    .header-actions { display: flex; align-items: center; gap: 0.75rem; }
-    .badge-open-count {
-      background: #ef4444;
-      color: #fff;
-      font-size: 0.75rem;
-      font-weight: 700;
-      padding: 0.2rem 0.55rem;
-      border-radius: 9999px;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
+    :root[data-theme="light"] header { background: var(--panel); }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark { width: 32px; height: 32px; flex-shrink: 0; }
+    .brand h1 { font-family: var(--font-display); font-weight: 300; font-size: 28px; letter-spacing: .04em; line-height: 1; color: var(--ink); }
+    .brand-sub { font-family: var(--font-mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 14px; margin-left: 4px; border-left: 1px solid var(--line); }
+    .mark-light { display: none; } :root[data-theme="light"] .mark-light { display: block; } :root[data-theme="light"] .mark-dark { display: none; }
 
-    .main-workspace {
-      display: flex;
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-    }
+    .header-actions { display: flex; align-items: center; gap: 16px; }
+    .badge-open-count { display: inline-flex; align-items: center; gap: 9px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .16em; color: var(--muted); white-space: nowrap; }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--reloc); box-shadow: 0 0 0 4px var(--accent-soft); animation: livePulse 2s ease-in-out infinite; }
+    .badge-open-count.demo .live-dot { background: var(--review); animation: none; }
+    @keyframes livePulse { 50% { box-shadow: 0 0 0 7px transparent; } }
+    .icon-btn { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+    .icon-btn:hover { color: var(--ink); border-color: var(--line-strong); }
+    .theme-sun { display: none; } :root[data-theme="light"] .theme-sun { display: block; } :root[data-theme="light"] .theme-moon { display: none; }
 
-    /* Map View */
-    #map {
-      flex: 1;
-      height: 100%;
-      width: 100%;
-      background: #cbd5e1;
-    }
+    .main-workspace { display: flex; flex: 1; position: relative; overflow: hidden; min-height: 0; }
 
-    .map-floating-panel {
-      position: absolute;
-      top: 1rem;
-      left: 1rem;
-      z-index: 900;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
+    /* Map */
+    #map { flex: 1; height: 100%; width: 100%; background: var(--map-bg); }
+    .leaflet-container { font-family: var(--font-sans); background: var(--map-bg); }
+    /* dark mode = the same OpenStreetMap tiles, inverted (no API key, sharp at zoom 19-20) */
+    :root[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.82) contrast(.92) saturate(.45); }
+    .leaflet-control-zoom.leaflet-bar { border: 1px solid var(--line) !important; border-radius: 6px; overflow: hidden; box-shadow: var(--shadow); margin: 0 20px 20px 0 !important; }
+    .leaflet-control-zoom a { width: 44px !important; height: 44px !important; line-height: 42px !important; background: var(--panel) !important; color: var(--muted) !important; border-bottom-color: var(--line) !important; font-weight: 300; }
+    .leaflet-control-zoom a:hover { color: var(--ink) !important; }
+    .leaflet-control-attribution { background: color-mix(in srgb, var(--panel) 80%, transparent) !important; color: var(--muted) !important; font-size: 10px; }
+    .leaflet-control-attribution a { color: var(--muted) !important; }
+    .leaflet-tooltip { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow); font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; }
+    .leaflet-tooltip-top:before { border-top-color: var(--line); } .leaflet-tooltip-bottom:before { border-bottom-color: var(--line); }
+    .leaflet-tooltip.zone-label { background: transparent; border: none; box-shadow: none; color: var(--accent-text); letter-spacing: .14em; text-transform: uppercase; font-size: 10.5px; }
+    .leaflet-tooltip.rel-label { background: var(--panel); border-color: var(--reloc); color: var(--reloc); letter-spacing: .12em; }
+    .leaflet-tooltip.rel-label:before { display: none; }
 
-    .btn-map-tool {
-      background: #fff;
-      border: 1px solid var(--border);
-      padding: 0.5rem 0.85rem;
-      border-radius: 8px;
-      font-size: 0.8125rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-      transition: all 0.15s ease;
-    }
-    .btn-map-tool:hover { background: #f8fafc; }
-    .btn-map-tool.active { background: #15803d; color: #fff; border-color: #15803d; }
+    /* Shield pins */
+    .pin { position: relative; width: 30px; height: 34px; color: var(--c); }
+    .pin svg { position: absolute; inset: 0; width: 30px; height: 34px; overflow: visible; filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
+    .pin .p-shape { fill: var(--c); stroke: var(--on-pin); stroke-width: 3; stroke-linejoin: round; }
+    .pin.false .p-shape { fill: var(--map-bg); stroke: var(--c); stroke-width: 5; }
+    .pin .p-num { position: absolute; inset: 0 0 3px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; color: var(--on-pin); }
+    .pin.false .p-num { color: var(--c); }
+    .pin .p-num .icon { width: 15px; height: 15px; stroke-width: 2.6; }
+    .pin.high::before, .pin.high::after { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; border: 1.5px solid var(--c); opacity: 0; animation: pinPing 2.4s ease-out infinite; }
+    .pin.high::after { animation-delay: 1.2s; }
+    @keyframes pinPing { 0% { transform: scale(.55); opacity: .7; } 100% { transform: scale(1.6); opacity: 0; } }
+    .pin.sel .p-ring { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; border: 1.5px dashed var(--ink); }
+    .pin-high { --c: var(--high); } .pin-review { --c: var(--review); } .pin-reloc { --c: var(--reloc); } .pin-false { --c: var(--false); } .pin-confirmed { --c: var(--high); }
 
-    /* Side / Drawer Panel */
-    .sidebar {
-      width: 380px;
-      background: #ffffff;
-      border-left: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      z-index: 950;
-      transition: transform 0.25s ease;
-      box-shadow: -2px 0 8px rgba(0,0,0,0.06);
-    }
+    /* Map tools (segmented panel) */
+    .map-floating-panel { position: absolute; top: 20px; left: 20px; z-index: 900; display: flex; flex-direction: column; width: 220px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: color-mix(in srgb, var(--panel) 94%, transparent); box-shadow: var(--shadow); }
+    .btn-map-tool { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border: none; border-bottom: 1px solid var(--line); background: transparent; color: var(--muted); font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; text-align: left; }
+    .btn-map-tool:last-child { border-bottom: none; }
+    .btn-map-tool:hover { color: var(--ink); }
+    .btn-map-tool.active { color: var(--accent-text); background: var(--accent-soft); }
 
-    .sidebar-tabs {
-      display: flex;
-      border-bottom: 1px solid var(--border);
-      background: #f8fafc;
-    }
-    .tab-btn {
-      flex: 1;
-      padding: 0.75rem;
-      text-align: center;
-      font-size: 0.8125rem;
-      font-weight: 600;
-      background: none;
-      border: none;
-      border-bottom: 2px solid transparent;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-    .tab-btn.active {
-      color: var(--primary);
-      border-bottom-color: var(--primary);
-      background: #ffffff;
-    }
+    .map-legend { position: absolute; left: 20px; bottom: 20px; z-index: 900; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; max-width: calc(100% - 600px); padding: 9px 12px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--line); border-radius: 6px; }
+    .map-legend > span { display: inline-flex; align-items: center; gap: 7px; }
+    .lg-pin { width: 12px; height: 14px; } .lg-pin path { fill: var(--c); stroke: var(--c); stroke-width: 6; } .lg-pin.false path { fill: transparent; }
+    .lg-sw { width: 16px; height: 8px; }
+    .lg-sep { width: 1px; height: 14px; background: var(--line); }
 
-    .tab-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
+    /* Sidebar */
+    .sidebar { width: 400px; flex-shrink: 0; background: var(--bg); border-left: 1px solid var(--line); display: flex; flex-direction: column; z-index: 950; min-height: 0; }
+    .sidebar-tabs { display: flex; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+    .tab-btn { flex: 1; height: 48px; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--muted); cursor: pointer; font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase; }
+    .tab-btn:hover { color: var(--ink); }
+    .tab-btn.active { color: var(--ink); border-bottom-color: var(--accent); }
+    .tab-content { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    #alertsListContainer, #flightWindowsContainer { display: flex; flex-direction: column; gap: 10px; }
 
-    /* Alerts List */
-    .filter-bar {
-      display: flex;
-      gap: 0.4rem;
-      margin-bottom: 0.5rem;
-    }
-    .filter-chip {
-      padding: 0.25rem 0.65rem;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      border: 1px solid var(--border);
-      background: #f1f5f9;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-    .filter-chip.active {
-      background: var(--bg-dark);
-      color: #fff;
-      border-color: var(--bg-dark);
-    }
+    .filter-bar { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; flex-shrink: 0; }
+    .filter-chip { flex: 1; height: 36px; border: none; border-right: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; }
+    .filter-chip:last-child { border-right: none; }
+    .filter-chip.active { background: var(--accent-soft); color: var(--accent-text); }
 
-    .alert-card {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.75rem;
-      background: #ffffff;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      display: flex;
-      gap: 0.75rem;
-      border-left: 4px solid #cbd5e1;
-    }
-    .alert-card:hover { border-color: #94a3b8; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .alert-card.selected { border-color: #2563eb; background: #eff6ff; }
-    .alert-card.alert-high { border-left-color: var(--color-high); }
-    .alert-card.alert-review { border-left-color: var(--color-review); }
-    .alert-card.alert-closed { border-left-color: var(--color-closed); opacity: 0.85; }
+    .alert-card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 12px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; transition: border-color .15s ease; }
+    .alert-card:hover { border-color: var(--line-strong); }
+    .alert-card.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+    .alert-card.alert-closed { opacity: .82; }
+    .alert-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .alert-title { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+    .alert-id { font-family: var(--font-mono); font-size: 12px; color: var(--accent-text); flex-shrink: 0; }
+    .alert-name { font-family: var(--font-display); font-weight: 500; font-size: 16px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .alert-line { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+    .alert-sub { font-size: 12.5px; color: var(--muted); }
+    .alert-note-snippet { font-size: 12.5px; color: var(--ink); opacity: .85; }
 
-    .alert-thumb-box {
-      width: 56px;
-      height: 56px;
-      border-radius: 6px;
-      background: #e2e8f0;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-      flex-shrink: 0;
-    }
+    /* Status chips (color + shape, never color alone) */
+    .badge-conf { --c: var(--muted); display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; white-space: nowrap; padding: 4px 7px; border-radius: 3px; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); border: 1px solid color-mix(in srgb, var(--c) 38%, transparent); }
+    .badge-conf::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+    .badge-high { --c: var(--high); } .badge-review { --c: var(--review); } .badge-confirmed { --c: var(--high); }
+    .badge-reloc { --c: var(--reloc); } .badge-reloc::before { width: 9px; height: 6px; border-radius: 0; background: none; border-left: 2px solid var(--c); border-bottom: 2px solid var(--c); transform: rotate(-45deg) translate(1px,-1px); }
+    .badge-false { --c: var(--false); } .badge-false::before { background: none; border: 1.5px solid var(--c); }
+    .badge-confirmed::before { border-radius: 1px; transform: rotate(45deg); }
 
-    .alert-info { flex: 1; }
-    .alert-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
-    .alert-id { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; color: #334155; }
-    
-    .badge-conf {
-      font-size: 0.6875rem;
-      font-weight: 700;
-      padding: 0.1rem 0.4rem;
-      border-radius: 4px;
-      text-transform: uppercase;
-    }
-    .badge-high { background: #fee2e2; color: #b91c1c; }
-    .badge-review { background: #fef3c7; color: #b45309; }
-    .badge-closed { background: #f1f5f9; color: #475569; }
+    /* Flight windows */
+    .plan-intro { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .flight-card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: var(--panel); display: flex; flex-direction: column; gap: 10px; }
+    .flight-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .flight-zone { font-family: var(--font-display); font-weight: 500; font-size: 16px; color: var(--ink); }
+    .flight-time { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .08em; color: var(--muted); margin-top: 4px; text-transform: uppercase; }
+    .thermal-badge-ok, .thermal-badge-no { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .14em; padding: 4px 7px; border-radius: 3px; white-space: nowrap; }
+    .thermal-badge-ok { color: var(--accent-text); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+    .thermal-badge-no { color: var(--muted); border: 1px solid var(--line); }
+    .prio { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+    .prio-bar { flex: 1; height: 3px; background: var(--line); } .prio-bar span { display: block; height: 3px; background: linear-gradient(90deg, #4ADE80, #16A34A); }
+    .flight-reasons { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.45; color: var(--ink); }
+    .flight-reasons li { padding-left: 14px; position: relative; } .flight-reasons li::before { content: ''; position: absolute; left: 0; top: .6em; width: 6px; height: 1.5px; background: var(--accent); }
 
-    .sensors-row { display: flex; gap: 0.3rem; margin-top: 0.25rem; }
-    .sensor-tag {
-      font-size: 0.6875rem;
-      font-weight: 600;
-      background: #f1f5f9;
-      color: #475569;
-      padding: 0.1rem 0.35rem;
-      border-radius: 4px;
-    }
-    .sensor-thermal { background: #fed7aa; color: #9a3412; }
-
-    .alert-note-snippet { font-size: 0.75rem; color: #475569; margin-top: 0.25rem; font-style: italic; }
-
-    /* Next Flights Panel */
-    .flight-card {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.85rem;
-      background: #ffffff;
-      border-top: 4px solid var(--primary);
-    }
-    .flight-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
-    .flight-zone { font-weight: 700; font-size: 0.9375rem; color: #1e293b; }
-    .flight-time { font-size: 0.8125rem; color: #475569; font-weight: 600; }
-    .thermal-badge-ok { background: #ffedd5; color: #c2410c; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px; }
-    .thermal-badge-no { background: #f1f5f9; color: #64748b; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px; }
-    .flight-reasons { list-style: disc; margin-left: 1.25rem; margin-top: 0.5rem; font-size: 0.8125rem; color: #334155; }
-    .flight-reasons li { margin-bottom: 0.25rem; }
-
-    /* Detail Modal / Sheet */
-    .detail-overlay {
-      position: absolute;
-      bottom: 0;
-      right: 0;
-      width: 400px;
-      background: #fff;
-      border-left: 1px solid var(--border);
-      border-top: 1px solid var(--border);
-      border-top-left-radius: 12px;
-      box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
-      z-index: 990;
-      max-height: 90%;
-      overflow-y: auto;
-      display: none;
-      flex-direction: column;
-    }
+    /* Detail panel: takes over the sidebar on a laptop, a bottom sheet on a phone */
+    .detail-overlay { position: absolute; top: 0; right: 0; bottom: 0; width: 400px; background: var(--bg); border-left: 1px solid var(--line); z-index: 1100; overflow-y: auto; display: none; flex-direction: column; }
     .detail-overlay.open { display: flex; }
-    .detail-header { padding: 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-    .detail-body { padding: 1rem; display: flex; flex-direction: column; gap: 0.85rem; }
-    
-    .detail-thumb-large {
-      width: 100%;
-      height: 160px;
-      border-radius: 8px;
-      background: #334155;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #94a3b8;
-      font-size: 3rem;
-      position: relative;
-      overflow: hidden;
-    }
+    .detail-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px 0; }
+    .btn-back { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 8px 0 2px; border: none; background: none; color: var(--muted); cursor: pointer; font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+    .btn-back:hover { color: var(--ink); }
+    .detail-body { padding: 8px 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+    .detail-title { display: flex; flex-direction: column; gap: 6px; }
+    .detail-num { font-family: var(--font-mono); font-size: 13px; color: var(--accent-text); }
+    .detail-name { font-family: var(--font-display); font-weight: 500; font-size: 26px; line-height: 1.15; color: var(--ink); }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+    .detail-grid > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .detail-grid .full { grid-column: 1 / -1; }
+    .lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
+    .val { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink); overflow-wrap: anywhere; }
+    .val.text { font-family: var(--font-sans); font-size: 13px; line-height: 1.45; }
 
-    /* Relocation Guide Card (F1) */
-    .relocation-guide-card {
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      border-radius: 8px;
-      padding: 0.85rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-    .relocation-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .relocation-tag {
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: #166534;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .relocation-instruction {
-      font-size: 0.875rem;
-      font-weight: 700;
-      color: #15803d;
-      background: #dcfce7;
-      padding: 0.4rem 0.65rem;
-      border-radius: 6px;
-      border-left: 4px solid #16a34a;
-    }
-    .relocation-meta {
-      font-size: 0.75rem;
-      color: #166534;
-      font-weight: 600;
-    }
-    .relocation-reasons-list {
-      list-style: disc;
-      margin-left: 1.25rem;
-      font-size: 0.75rem;
-      color: #374151;
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-    }
-    
-    .btn-nav-gmaps {
-      background: #2563eb;
-      color: #fff;
-      text-decoration: none;
-      padding: 0.65rem 1rem;
-      border-radius: 6px;
-      font-weight: 600;
-      font-size: 0.875rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-    }
+    .relocation-guide-card { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--accent) 5%, transparent); }
+    .relocation-header { display: flex; justify-content: space-between; align-items: center; }
+    .relocation-tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em; color: var(--accent-text); text-transform: uppercase; }
+    .relocation-instruction { font-family: var(--font-display); font-weight: 500; font-size: 21px; line-height: 1.3; color: var(--ink); }
+    .relocation-meta { display: flex; gap: 22px; flex-wrap: wrap; }
+    .relocation-meta > div { display: flex; flex-direction: column; gap: 3px; }
+    .relocation-meta .val { font-size: 18px; color: var(--accent-text); }
+    .relocation-meta .val small { font-size: 11px; color: var(--muted); }
+    .callout { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-left: 2px solid var(--accent); border-radius: 0 6px 6px 0; background: var(--accent-soft); font-size: 13px; line-height: 1.45; color: var(--ink); }
+    .callout .icon { color: var(--accent-text); }
+    .relocation-reasons-list { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.45; color: var(--ink); }
+    .relocation-reasons-list li { padding-left: 14px; position: relative; } .relocation-reasons-list li::before { content: ''; position: absolute; left: 0; top: .6em; width: 6px; height: 1.5px; background: var(--accent); }
 
-    .triage-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
-    .btn-triage {
-      padding: 0.6rem 0.3rem;
-      font-size: 0.75rem;
-      font-weight: 700;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.25rem;
-      transition: opacity 0.15s ease;
-    }
-    .btn-triage:hover { opacity: 0.85; }
-    .btn-relocated { background: #16a34a; color: #fff; }
-    .btn-confirmed { background: #2563eb; color: #fff; }
-    .btn-fp { background: #64748b; color: #fff; }
+    .btn-nav-gmaps { height: 52px; border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; background: linear-gradient(90deg, #22C55E, #16A34A 60%, #15803D); border: 1px solid #4ADE80; color: #04140A; font-family: var(--font-display); font-weight: 500; font-size: 15px; letter-spacing: .2em; }
+    :root[data-theme="light"] .btn-nav-gmaps { border-color: #15803D; }
+    .btn-nav-gmaps:hover { filter: brightness(1.08); }
 
+    .triage-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .btn-triage { --c: var(--muted); min-height: 56px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); background: var(--panel); color: var(--c); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+    .btn-triage:hover { background: color-mix(in srgb, var(--c) 10%, var(--panel)); }
+    .btn-relocated { --c: var(--reloc); } .btn-confirmed { --c: var(--review); } .btn-fp { --c: var(--false); }
+
+    /* A.E.R.O. voice button: sits on the map, left of the zoom buttons */
+    html body #ht-dock { right: 484px; bottom: 20px; }
+
+    /* sheet handles (phone): tap or drag down to see the whole map, tap or drag up to bring the sheet back */
+    .sheet-handle { display: none; }
+    #toast { position: fixed; left: 50%; top: calc(76px + env(safe-area-inset-top)); transform: translate(-50%, -12px); z-index: 12000; opacity: 0; pointer-events: none;
+      max-width: calc(100vw - 24px); padding: 10px 14px; border-radius: 6px; background: var(--panel); border: 1px solid var(--accent); color: var(--ink); box-shadow: var(--shadow);
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; transition: opacity .25s ease, transform .25s ease; }
+    #toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 1100px) { .brand-sub { display: none; } .map-legend { display: none; } }
     @media (max-width: 768px) {
+      header { height: calc(56px + env(safe-area-inset-top)); padding-left: 12px; padding-right: 12px; }
+      .tab-content { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+      .detail-body { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+      .brand h1 { font-size: 22px; } .brand-mark { width: 26px; height: 26px; }
+      .badge-open-count .site { display: none; }
       .main-workspace { flex-direction: column; }
-      .sidebar { width: 100%; height: 50%; border-left: none; border-top: 1px solid var(--border); }
-      .detail-overlay { width: 100%; left: 0; border-radius: 16px 16px 0 0; }
+      .sidebar { width: 100%; height: 48%; border-left: none; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; margin-top: -16px; box-shadow: 0 -10px 28px rgba(0,0,0,.25); transition: height .25s ease; }
+      .sidebar { z-index: 1050; }
+      .leaflet-bottom { bottom: 16px; }   /* map credits sit above the rounded sheet edge, still visible */
+      body.sheet-down .sidebar { height: calc(78px + env(safe-area-inset-bottom)); }
+      .sheet-handle { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 100%; height: 30px; border: none; background: none; cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent; }
+      .sheet-handle::before { content: ''; width: 40px; height: 5px; border-radius: 3px; background: var(--line-strong); }
+      .map-floating-panel { left: auto; right: 12px; top: 12px; width: auto; }
+      .btn-map-tool { width: 44px; padding: 0; justify-content: center; } .btn-map-tool .t { display: none; }
+      .detail-overlay { top: auto; left: 0; width: 100%; max-height: 80%; border-left: none; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; box-shadow: 0 -12px 30px rgba(0,0,0,.3); }
+      .detail-overlay { transition: max-height .25s ease; }
+      .detail-overlay.down { max-height: calc(150px + env(safe-area-inset-bottom)); overflow: hidden; }
+      .detail-header, .detail-body { padding-left: 16px; padding-right: 16px; }
+      .detail-name { font-size: 24px; } .relocation-instruction { font-size: 19px; }
+      .leaflet-control-zoom { display: none; }
+      html body #ht-dock { right: 14px; bottom: calc(48% + 14px); transition: bottom .25s ease; }
+      html body.sheet-down #ht-dock { bottom: calc(92px + env(safe-area-inset-bottom)); }
+      html body.detail-open #ht-dock { bottom: auto; top: calc(70px + env(safe-area-inset-top)); right: auto; left: 12px; flex-direction: column; }
     }
+    @media (prefers-reduced-motion: reduce) { .live-dot, .pin.high::before, .pin.high::after { animation: none; } }
   </style>
 </head>
 <body>
 
+<!-- [A.E.R.O. UI] icon sprite: thin line icons, drawn in currentColor -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="aeroGrad" x1="0.2" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#4ADE80"/><stop offset="0.55" stop-color="#16A34A"/><stop offset="1" stop-color="#052E16"/></linearGradient>
+    <symbol id="i-boundary" viewBox="0 0 24 24"><path d="M4 7l6-3 8 3 2 9-7 4-8-3z" stroke-dasharray="3 2"/></symbol>
+    <symbol id="i-band" viewBox="0 0 24 24"><path d="M3 17c4-8 14-8 18 0"/><path d="M6 17c3-5 9-5 12 0" opacity=".55"/></symbol>
+    <symbol id="i-recenter" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
+    <symbol id="i-nav" viewBox="0 0 24 24"><path d="M12 2l7 19-7-4-7 4z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M7 11V6a1.5 1.5 0 0 1 3 0v4M10 10V4.5a1.5 1.5 0 0 1 3 0V10M13 10V5.5a1.5 1.5 0 0 1 3 0V12M16 9.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-1a6 6 0 0 1-5-3l-2.5-4a1.5 1.5 0 0 1 2.5-1.6L7 14"/></symbol>
+  </defs>
+</svg>
+
 <div class="app-root">
   <header>
     <div class="brand">
-      <div class="brand-icon">🐢</div>
-      <div>
-        <h1>What About the Turtles</h1>
-        <span>Field Responder App · W.A. Hazel & Aero Animal Rescue</span>
-      </div>
+      <svg class="brand-mark mark-dark" viewBox="0 0 64 64" aria-hidden="true"><path fill="url(#aeroGrad)" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><polygon fill="#DCFCE7" stroke="#052E16" stroke-width="1.6" stroke-linejoin="round" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>
+      <svg class="brand-mark mark-light" viewBox="0 0 64 64" aria-hidden="true"><path fill="none" stroke="#14532D" stroke-width="3" stroke-linejoin="round" d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/><polygon fill="url(#aeroGrad)" stroke="#14532D" stroke-width="2" stroke-linejoin="round" points="32,19 41.5,24.5 41.5,35.5 32,41 22.5,35.5 22.5,24.5"/></svg>
+      <h1>A.E.R.O.</h1>
+      <span class="brand-sub">Field system · W.A. Hazel × Aero Animal Rescue</span>
     </div>
     <div class="header-actions">
-      <div class="badge-open-count" id="openCountBadge">
-        <span>⚠</span> <span id="openCountNumber">2</span> Open Alerts
+      <div class="badge-open-count" id="openCountBadge" aria-live="polite">
+        <span class="live-dot"></span><span id="liveLabel">LIVE</span><span class="site">· GRAYSON OVERLOOK</span><span>· <span id="openCountNumber">0</span> OPEN</span>
       </div>
+      <button class="icon-btn" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="Switch light or dark theme">
+        <svg class="icon theme-moon"><use href="#i-moon"/></svg><svg class="icon theme-sun"><use href="#i-sun"/></svg>
+      </button>
     </div>
   </header>
 
@@ -398,96 +298,103 @@
     <div id="map"></div>
 
     <!-- Floating Map Controls -->
-    <div class="map-floating-panel">
-      <button class="btn-map-tool" id="btnToggleZones" onclick="toggleZones()">
-        <span>🏗</span> Work Zones
+    <div class="map-floating-panel" role="toolbar" aria-label="Map layers">
+      <button class="btn-map-tool active" id="btnToggleZones" onclick="toggleZones()" aria-pressed="true" title="Site boundary">
+        <svg class="icon"><use href="#i-boundary"/></svg><span class="t">Site boundary</span>
       </button>
-      <button class="btn-map-tool" id="btnToggleHeatmap" onclick="toggleHeatmap()">
-        <span>🔥</span> Turtle Likelihood Heatmap
+      <button class="btn-map-tool active" id="btnToggleHeatmap" onclick="toggleHeatmap()" aria-pressed="true" title="Fence band (turtle likelihood)">
+        <svg class="icon"><use href="#i-band"/></svg><span class="t">Fence band</span>
       </button>
-      <button class="btn-map-tool" onclick="resetMapView()">
-        <span>🎯</span> Center Site (Grayson)
+      <button class="btn-map-tool" onclick="resetMapView()" title="Recenter site">
+        <svg class="icon"><use href="#i-recenter"/></svg><span class="t">Recenter site</span>
       </button>
+    </div>
+
+    <div class="map-legend" aria-label="Map legend">
+      <span><svg class="lg-pin" viewBox="0 0 64 64" style="--c:var(--high)"><path d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/></svg>High</span>
+      <span><svg class="lg-pin" viewBox="0 0 64 64" style="--c:var(--review)"><path d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/></svg>Review</span>
+      <span><svg class="lg-pin" viewBox="0 0 64 64" style="--c:var(--reloc)"><path d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/></svg>Relocated</span>
+      <span><svg class="lg-pin false" viewBox="0 0 64 64" style="--c:var(--false)"><path d="M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z"/></svg>False</span>
+      <span class="lg-sep"></span>
+      <span><span class="lg-sw" style="background:color-mix(in srgb,var(--high) 45%,transparent)"></span>Check inside fence</span>
+      <span><span class="lg-sw" style="background:color-mix(in srgb,var(--reloc) 40%,transparent)"></span>Cover outside</span>
     </div>
 
     <!-- Sidebar with Tabs -->
     <aside class="sidebar">
-      <div class="sidebar-tabs">
-        <button class="tab-btn active" id="tabAlertsBtn" onclick="switchTab('alerts')">Active Alerts</button>
-        <button class="tab-btn" id="tabPlannerBtn" onclick="switchTab('planner')">Flight Windows</button>
+      <button class="sheet-handle" type="button" data-sheet="list" aria-label="Show or hide the alert list"></button>
+      <div class="sidebar-tabs" role="tablist">
+        <button class="tab-btn active" id="tabAlertsBtn" role="tab" onclick="switchTab('alerts')">Alerts · <span id="tabOpenCount">0</span> open</button>
+        <button class="tab-btn" id="tabPlannerBtn" role="tab" onclick="switchTab('planner')">Flight windows</button>
       </div>
 
       <!-- Tab: Alerts -->
       <div class="tab-content" id="tabAlerts">
         <div class="filter-bar">
-          <button class="filter-chip active" onclick="setFilter('all', this)">All</button>
-          <button class="filter-chip" onclick="setFilter('open', this)">Open Only</button>
-          <button class="filter-chip" onclick="setFilter('closed', this)">Resolved</button>
+          <button class="filter-chip active" onclick="setFilter('all', this)">All <span id="cntAll"></span></button>
+          <button class="filter-chip" onclick="setFilter('open', this)">Open <span id="cntOpen"></span></button>
+          <button class="filter-chip" onclick="setFilter('closed', this)">Resolved <span id="cntClosed"></span></button>
         </div>
         <div id="alertsListContainer"></div>
       </div>
 
       <!-- Tab: Next Flights / Planner -->
       <div class="tab-content" id="tabPlanner" style="display: none;">
-        <div style="font-size: 0.8125rem; color: #475569; margin-bottom: 0.5rem;">
-          <strong>Survey Strategy:</strong> Detect turtles before heavy equipment clearing begins.
-        </div>
+        <div class="plan-intro">Fly before heavy equipment clears each zone, so turtles are found and moved first.</div>
         <div id="flightWindowsContainer"></div>
       </div>
     </aside>
 
-    <!-- Slide-up Alert Detail Sheet with Relocation Guide -->
-    <div class="detail-overlay" id="detailSheet">
+    <!-- Alert detail: takes over the sidebar on a laptop, slides up on a phone -->
+    <div class="detail-overlay" id="detailSheet" role="dialog" aria-labelledby="detailAlertId">
+      <button class="sheet-handle" type="button" data-sheet="detail" aria-label="Show or hide the alert details"></button>
       <div class="detail-header">
-        <strong id="detailAlertId">Alert Detail</strong>
-        <button onclick="closeDetail()" style="background:none; border:none; font-size:1.25rem; cursor:pointer;">✕</button>
+        <button class="btn-back" type="button" onclick="closeDetail()"><svg class="icon" style="width:15px;height:15px"><use href="#i-back"/></svg>Alerts</button>
+        <span id="detailConfidenceBadge" class="badge-conf badge-high">High priority</span>
       </div>
       <div class="detail-body">
-        <div class="detail-thumb-large" id="detailThumb">
-          🐢
-        </div>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span id="detailConfidenceBadge" class="badge-conf badge-high">HIGH CONFIDENCE</span>
-          <span id="detailScore" style="font-size:0.875rem; font-weight:700;">Score: 88%</span>
-        </div>
-        
-        <div style="font-size:0.8125rem; color:#475569;">
-          <strong>Sensors:</strong> <span id="detailSensors">RGB + Thermal</span><br>
-          <strong>Detected At:</strong> <span id="detailTime">2026-10-25 14:22 UTC</span><br>
-          <strong>Coordinates:</strong> <span id="detailCoords" class="font-mono">38.7601, -77.5199</span><br>
-          <strong>Note:</strong> <span id="detailNote">Eastern box turtle near haul road</span>
+        <div class="detail-title">
+          <span class="detail-num" id="detailNum">(01)</span>
+          <strong class="detail-name" id="detailAlertId">Alert</strong>
+          <span class="alert-sub" id="detailScore"></span>
         </div>
 
-        <!-- Relocation Guide (F1 Feature from Tanya Finch) -->
+        <div class="detail-grid">
+          <div><span class="lbl">Coords</span><span class="val" id="detailCoords"></span></div>
+          <div><span class="lbl">Detected</span><span class="val" id="detailTime"></span></div>
+          <div><span class="lbl">Sensors</span><span class="val" id="detailSensors"></span></div>
+          <div><span class="lbl">Species</span><span class="val" id="detailSpecies">Not confirmed</span></div>
+          <div class="full"><span class="lbl">Last update</span><span class="val" id="detailUpdated">None yet</span></div>
+          <div class="full"><span class="lbl">Note</span><span class="val text" id="detailNote"></span></div>
+        </div>
+
+        <!-- Relocation Guide (F1, Tanya Finch's rules) -->
         <div class="relocation-guide-card" id="relocationBox">
           <div class="relocation-header">
-            <span class="relocation-tag">🧭 Relocation Guide (Tanya's Rules)</span>
-            <span class="relocation-meta" id="relocationMeta">47m · Bearing 0°</span>
+            <span class="relocation-tag">Relocation · Tanya's rules</span>
+            <span class="lbl">F1</span>
           </div>
-          <div class="relocation-instruction" id="relocationPrimary">
-            👉 Carry 47 m north to dense cover over the silt fence into the woodline
-          </div>
-          <ul class="relocation-reasons-list" id="relocationReasons">
-            <li>Tanya: Pick up like a hamburger with two hands.</li>
-            <li>Dense canopy cover with leaf litter (NDVI 0.62) safely away from haul road.</li>
-          </ul>
+          <div class="relocation-instruction" id="relocationPrimary"></div>
+          <div class="relocation-meta" id="relocationMeta"></div>
+          <div class="callout" id="relocationTip" style="display:none"><svg class="icon"><use href="#i-hand"/></svg><span></span></div>
+          <ul class="relocation-reasons-list" id="relocationReasons"></ul>
         </div>
 
         <a id="btnNavMaps" class="btn-nav-gmaps" href="#" target="_blank" rel="noopener">
-          <span>🧭</span> Navigate to Turtle on Google Maps
+          <svg class="icon"><use href="#i-nav"/></svg> NAVIGATE TO TURTLE
         </a>
 
-        <div style="margin-top:0.5rem;">
-          <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#64748b;">Field Responder Action:</label>
+        <div>
+          <span class="lbl">Responder action</span>
           <div class="triage-actions">
             <button class="btn-triage btn-relocated" onclick="updateAlertStatus('relocated')">
-              <span>🌿</span> Relocated
+              <svg class="icon"><use href="#i-check"/></svg> Relocated
             </button>
             <button class="btn-triage btn-confirmed" onclick="updateAlertStatus('confirmed')">
-              <span>✓</span> Confirmed
+              <svg class="icon"><use href="#i-flag"/></svg> Confirmed
             </button>
             <button class="btn-triage btn-fp" onclick="updateAlertStatus('false_positive')">
-              <span>✕</span> False Alarm
+              <svg class="icon"><use href="#i-x"/></svg> False alarm
             </button>
           </div>
         </div>
@@ -495,9 +402,11 @@
     </div>
   </div>
 </div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
-  const API_BASE = window.API_BASE || 'http://localhost:8000';
+  // [A.E.R.O. integration] use the server this page came from (works on localhost, a tunnel, or real hosting)
+  const API_BASE = window.API_BASE || (location.protocol.startsWith('http') ? location.origin : 'http://localhost:8000');
 
   let alerts = [];
   let zones = [];
@@ -505,7 +414,8 @@
   let currentFilter = 'all';
   let activeAlert = null;
   let showZones = true;
-  let showHeatmap = false;
+  let showHeatmap = true;   // [A.E.R.O. UI] fence band on by default (matches the mockups)
+  let liveData = false;
 
   let map;
   let alertMarkersLayer;
@@ -673,12 +583,24 @@
     }
   };
 
+  // [A.E.R.O. UI] theme: dark command center / light field mode, remembered per device
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  function applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    try { localStorage.setItem('aero-theme', theme); } catch (e) {}
+    if (!map) return;   // the tiles restyle through CSS; pins, zones and the heat map re-read the theme colors
+    renderZones(); renderAlertMarkers(); restyleHeatmap();
+    if (activeAlert && lastRelocation) renderRelocationGuide(activeAlert, lastRelocation);
+  }
+  function toggleTheme() { applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); }
+
   function initMap() {
     map = L.map('map', { zoomControl: false }).setView([38.7601, -77.5198], 18);
     L.control.zoom({ position: 'bottomright' }).addTo(map);   // [A.E.R.O. integration] keep +/- clear of the map buttons
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 21,
+      maxNativeZoom: 19,   // [A.E.R.O. UI] OSM stops at 19; past that Leaflet scales tiles up instead of showing blanks
       attribution: '© OpenStreetMap | W.A. Hazel Grayson Overlook'
     }).addTo(map);
 
@@ -693,12 +615,14 @@
     if (!showZones) return;
 
     zones.forEach(z => {
+      const site = z.zone_id === 'SITE';   // [A.E.R.O. UI] site boundary in brand green, work zones in review amber
       const polygon = L.polygon(z.polygon, {
-        color: '#d97706',
-        fillColor: '#fef3c7',
-        fillOpacity: 0.25,
-        weight: 2,
-        dashArray: '5, 5'
+        color: site ? css('--accent') : css('--review'),
+        fillColor: site ? css('--accent') : css('--review'),
+        fillOpacity: site ? 0.03 : 0.05,
+        weight: site ? 1.6 : 1.5,
+        dashArray: '6, 5',
+        interactive: true
       }).addTo(zonesLayer);
 
       const label = `${z.name} (${z.work.toUpperCase()})` + (z.work_starts ? `<br><small>Starts: ${new Date(z.work_starts).toLocaleDateString()}</small>` : '');
@@ -706,38 +630,44 @@
     });
   }
 
-  function getMarkerColor(alert) {
-    if (alert.status !== 'open') return '#64748b';
-    if (alert.confidence === 'high') return '#dc2626';
-    return '#d97706';
+  // [A.E.R.O. UI] one status per alert: color + shape + label (never color alone)
+  const STATUS = {
+    high: 'High priority', review: 'Needs review', confirmed: 'Confirmed', reloc: 'Relocated', false: 'False alarm',
+  };
+  function statusOf(a) {
+    if (a.status === 'relocated') return 'reloc';
+    if (a.status === 'false_positive') return 'false';
+    if (a.status === 'confirmed') return 'confirmed';
+    return a.confidence === 'high' ? 'high' : 'review';
   }
+  const alertNum = a => String(a.number || (alerts.indexOf(a) + 1)).padStart(2, '0');
+  const SHIELD_D = 'M32 3 L56 11 V30 C56 45 46 55 32 61 C18 55 8 45 8 30 V11 Z';
+  const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   function renderAlertMarkers() {
     alertMarkersLayer.clearLayers();
 
     alerts.forEach(alert => {
-      const color = getMarkerColor(alert);
-      const marker = L.circleMarker([alert.lat, alert.lon], {
-        radius: 10,
-        fillColor: color,
-        color: '#ffffff',
-        weight: 2.5,
-        opacity: 1,
-        fillOpacity: 0.95
-      }).addTo(alertMarkersLayer);
+      const st = statusOf(alert), sel = activeAlert && activeAlert.alert_id === alert.alert_id;
+      const inner = st === 'reloc' ? '<svg class="icon"><use href="#i-check"/></svg>' : alertNum(alert);
+      const icon = L.divIcon({
+        className: '', iconSize: [30, 34], iconAnchor: [15, 17], tooltipAnchor: [0, -18],
+        html: `<div class="pin pin-${st} ${st === 'high' ? 'high' : ''} ${st === 'false' ? 'false' : ''} ${sel ? 'sel' : ''}"><span class="p-ring"></span><svg viewBox="0 0 64 64"><path class="p-shape" d="${SHIELD_D}"/></svg><span class="p-num">${inner}</span></div>`,
+      });
+      const marker = L.marker([alert.lat, alert.lon], { icon, keyboard: true, title: alertName(alert), zIndexOffset: sel ? 1000 : 0 }).addTo(alertMarkersLayer);
 
       marker.on('click', () => openDetail(alert));
 
-      marker.bindTooltip(`<strong>${alertName(alert)}</strong><br>${alert.confidence.toUpperCase()} - ${alert.status}`, {
-        direction: 'top',
-        offset: [0, -8]
-      });
+      marker.bindTooltip(`(${alertNum(alert)}) ${esc(alertName(alert))} · ${STATUS[st].toUpperCase()}`, { direction: 'top' });
     });
   }
 
   // [A.E.R.O. integration] friendly name + honest score for hidden-shell test spots (no detector score yet)
   const alertName = a => a.label || a.alert_id;
   const scoreText = a => a.score == null ? 'Test spot · no detector score yet' : `Score: ${(a.score * 100).toFixed(0)}%`;
+  // [A.E.R.O. UI] short local time ("14:31 · NOV 01"), compass direction, feet for US crews
+  const whenText = iso => { const d = new Date(iso); if (isNaN(d)) return iso || ''; return `${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} · ${d.toLocaleDateString([], { month: 'short', day: '2-digit' }).toUpperCase()}`; };
+  const compass = deg => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((deg % 360) + 360) % 360 / 45) % 8];
 
   function renderAlertsList() {
     const container = document.getElementById('alertsListContainer');
@@ -751,32 +681,32 @@
 
     const openCount = alerts.filter(a => a.status === 'open').length;
     document.getElementById('openCountNumber').innerText = openCount;
+    document.getElementById('tabOpenCount').innerText = openCount;
+    document.getElementById('cntAll').innerText = alerts.length;
+    document.getElementById('cntOpen').innerText = openCount;
+    document.getElementById('cntClosed').innerText = alerts.length - openCount;
 
     filtered.forEach(alert => {
+      const st = statusOf(alert);
       const card = document.createElement('div');
       card.className = `alert-card alert-${alert.status !== 'open' ? 'closed' : alert.confidence}`;
+      card.tabIndex = 0; card.setAttribute('role', 'button');
       if (activeAlert && activeAlert.alert_id === alert.alert_id) card.classList.add('selected');
 
-      const confBadgeClass = alert.status !== 'open' ? 'badge-closed' : (alert.confidence === 'high' ? 'badge-high' : 'badge-review');
-      const confText = alert.status !== 'open' ? alert.status.toUpperCase() : alert.confidence.toUpperCase();
-
+      // [A.E.R.O. UI] (01) number + name, status chip, mono detail line; no emoji thumbnail
       card.innerHTML = `
-        <div class="alert-thumb-box">🐢</div>
-        <div class="alert-info">
-          <div class="alert-meta">
-            <span class="alert-id">${alertName(alert)}</span>
-            <span class="badge-conf ${confBadgeClass}">${confText}</span>
-          </div>
-          <div style="font-size:0.8125rem; font-weight:600;">${scoreText(alert)}</div>
-          <div class="sensors-row">
-            ${alert.sensors.map(s => `<span class="sensor-tag ${s === 'thermal' ? 'sensor-thermal' : ''}">${s.toUpperCase()}</span>`).join('')}
-          </div>
-          ${alert.note ? `<div class="alert-note-snippet">${alert.note}</div>` : ''}
+        <div class="alert-meta">
+          <div class="alert-title"><span class="alert-id">(${alertNum(alert)})</span><span class="alert-name">${esc(alertName(alert))}</span></div>
+          <span class="badge-conf badge-${st}">${STATUS[st]}</span>
         </div>
+        <div class="alert-line">Detected ${whenText(alert.created_at)} · ${alert.sensors.map(s => s.toUpperCase()).join(' + ')}</div>
+        <div class="alert-sub">${scoreText(alert)}</div>
+        ${alert.note ? `<div class="alert-note-snippet">${esc(alert.note)}</div>` : ''}
       `;
+      card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.onclick(); } };
 
       card.onclick = () => {
-        map.setView([alert.lat, alert.lon], 20);
+        map.setView([alert.lat, alert.lon], 20, { animate: innerWidth > 768 });   // phone: no animation, openDetail shifts the pin above the sheet
         openDetail(alert);
       };
 
@@ -794,36 +724,32 @@
       const startDate = new Date(w.start);
       const timeStr = `${startDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
+      const endStr = w.end ? new Date(w.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       card.innerHTML = `
         <div class="flight-header">
           <div>
-            <div class="flight-zone">Zone ${w.zone_id} (${w.zone_name || 'Work Area'})</div>
-            <div class="flight-time">🕒 ${timeStr}</div>
+            <div class="flight-zone">${esc(w.zone_name || 'Work area')}</div>
+            <div class="flight-time">${timeStr}${endStr ? ' to ' + endStr : ''} · Zone ${esc(w.zone_id)}</div>
           </div>
           <div>${w.thermal_ok ? '<span class="thermal-badge-ok">THERMAL OK</span>' : '<span class="thermal-badge-no">RGB ONLY</span>'}</div>
         </div>
-        <div style="font-size:0.75rem; font-weight:700; color:#15803d;">Priority Rank: ${(w.priority * 100).toFixed(0)}%</div>
-        <ul class="flight-reasons">${w.reasons.map(r => `<li>${r}</li>`).join('')}</ul>
+        <div class="prio"><span>Priority</span><span class="prio-bar"><span style="width:${(w.priority * 100).toFixed(0)}%"></span></span><span>${(w.priority * 100).toFixed(0)}%</span></div>
+        <ul class="flight-reasons">${w.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
       `;
       container.appendChild(card);
     });
   }
 
   async function openDetail(alert) {
-    activeAlert = alert;
-    document.getElementById('detailAlertId').innerText = alertName(alert);
-    document.getElementById('detailScore').innerText = scoreText(alert);
-    document.getElementById('detailSensors').innerText = alert.sensors.map(s => s.toUpperCase()).join(' + ');
-    document.getElementById('detailTime').innerText = alert.created_at;
-    document.getElementById('detailCoords').innerText = `${alert.lat.toFixed(6)}, ${alert.lon.toFixed(6)}`;
-    document.getElementById('detailNote').innerText = alert.note || '(No responder note)';
-
-    const badge = document.getElementById('detailConfidenceBadge');
-    badge.className = `badge-conf ${alert.status !== 'open' ? 'badge-closed' : (alert.confidence === 'high' ? 'badge-high' : 'badge-review')}`;
-    badge.innerText = alert.status !== 'open' ? alert.status.toUpperCase() : `${alert.confidence.toUpperCase()} CONFIDENCE`;
+    fillDetail(alert);
+    // phone with the chat open: the details stay slid down (the chat is on top); otherwise they come up
+    const keepDown = innerWidth <= 768 && document.body.classList.contains('ht-open');
+    document.getElementById('detailSheet').classList.toggle('down', keepDown);
+    if (keepDown) chatPushedDetail = true;
+    document.body.classList.add('detail-open');
+    renderAlertMarkers();
 
     document.getElementById('btnNavMaps').href = `https://www.google.com/maps/dir/?api=1&destination=${alert.lat},${alert.lon}`;
-
     // Fetch or mock Relocation Suggestion (F1 feature from Naz / Tanya)
     let relocation = MOCK_RELOCATIONS[alert.alert_id];
     try {
@@ -831,13 +757,41 @@
       if (res.ok) relocation = await res.json();
     } catch (e) {}
 
+    if (!activeAlert || activeAlert.alert_id !== alert.alert_id) return;   // another pin was opened while this was loading
+    lastRelocation = relocation;
     renderRelocationGuide(alert, relocation);
 
     document.getElementById('detailSheet').classList.add('open');
     renderAlertsList();
+    // [A.E.R.O. UI] phone: the sheet covers most of the map, so slide the pin into the strip that's still visible
+    if (innerWidth <= 768) {
+      const sheetTop = document.getElementById('detailSheet').getBoundingClientRect().top, mapTop = document.getElementById('map').getBoundingClientRect().top;
+      const z = map.getZoom(), shift = map.getSize().y / 2 - (sheetTop - mapTop) / 2;
+      map.setView(map.unproject(map.project([alert.lat, alert.lon], z).add([0, shift]), z), z, { animate: false });
+    }
+  }
+
+  // [A.E.R.O. UI] the text fields of the detail panel (also used when another device changes this alert)
+  function fillDetail(alert) {
+    activeAlert = alert;
+    const st = statusOf(alert);
+    document.getElementById('detailNum').innerText = `(${alertNum(alert)})`;
+    document.getElementById('detailAlertId').innerText = alertName(alert);
+    document.getElementById('detailScore').innerText = scoreText(alert);
+    document.getElementById('detailSensors').innerText = alert.sensors.map(s => s.toUpperCase()).join(' + ');
+    document.getElementById('detailTime').innerText = whenText(alert.created_at);
+    document.getElementById('detailCoords').innerText = `${alert.lat.toFixed(6)}, ${alert.lon.toFixed(6)}`;
+    document.getElementById('detailSpecies').innerText = alert.species || 'Not confirmed';
+    document.getElementById('detailNote').innerText = alert.note || 'No responder note yet';
+
+    const badge = document.getElementById('detailConfidenceBadge');
+    badge.className = `badge-conf badge-${st}`;
+    badge.innerText = STATUS[st];
+    document.getElementById('detailUpdated').innerText = alert.updated_at ? `${alert.updated_at}${alert.updated_by ? ' · ' + alert.updated_by.toUpperCase() : ''}` : 'None yet';
   }
 
   // Draw relocation arrow on Leaflet map & populate UI
+  let lastRelocation = null;
   function renderRelocationGuide(alert, rel) {
     relocationLayer.clearLayers();
     const box = document.getElementById('relocationBox');
@@ -848,39 +802,43 @@
     }
 
     box.style.display = 'flex';
-    document.getElementById('relocationMeta').innerText = `${rel.distance_m}m · Bearing ${Math.round(rel.bearing_deg)}°`;
-    document.getElementById('relocationPrimary').innerText = `👉 ${rel.reasons[0]}`;
-    
-    const reasonsList = document.getElementById('relocationReasons');
-    reasonsList.innerHTML = rel.reasons.slice(1).map(r => `<li>${r}</li>`).join('');
+    const m = Math.round(rel.distance_m), deg = Math.round(rel.bearing_deg);
+    document.getElementById('relocationMeta').innerHTML = `
+      <div><span class="lbl">Distance</span><span class="val">${m} M <small>${Math.round(m / 0.3048)} FT</small></span></div>
+      <div><span class="lbl">Bearing</span><span class="val">${String(deg).padStart(3, '0')}° ${compass(deg)}</span></div>`;
+    document.getElementById('relocationPrimary').innerText = rel.reasons[0];
+
+    // Tanya's carry tip gets its own callout; the rest are reasons
+    const rest = rel.reasons.slice(1), tip = rest.find(r => /^Tanya\b/i.test(r));
+    const tipBox = document.getElementById('relocationTip');
+    tipBox.style.display = tip ? 'flex' : 'none';
+    tipBox.querySelector('span').innerText = tip || '';
+    document.getElementById('relocationReasons').innerHTML = rest.filter(r => r !== tip).map(r => `<li>${esc(r)}</li>`).join('');
 
     // Draw Arrow on Leaflet Map
     const start = [alert.lat, alert.lon];
     const end = [rel.target_lat, rel.target_lon];
+    const green = css('--reloc');
 
     // Direction line
-    L.polyline([start, end], {
-      color: '#16a34a',
-      weight: 4,
-      dashArray: '6, 8',
-      opacity: 0.95
-    }).addTo(relocationLayer);
-
-    // Target Release Point marker
-    L.circleMarker(end, {
-      radius: 8,
-      fillColor: '#16a34a',
-      color: '#ffffff',
-      weight: 2,
-      fillOpacity: 1
-    }).bindTooltip(`<strong>Target Release:</strong><br>${rel.reasons[0]}`, { permanent: true, direction: 'top' })
+    L.polyline([start, end], { color: green, weight: 2.5, dashArray: '7, 6', opacity: 0.95, interactive: false })
+      .bindTooltip(`${m} M · ${compass(deg)}`, { permanent: true, direction: 'right', className: 'rel-label', offset: [8, 0] })
       .addTo(relocationLayer);
+
+    // Target release point
+    L.circleMarker(end, { radius: 7, fillColor: green, color: green, weight: 2, fillOpacity: 0.25 })
+      .bindTooltip('RELEASE POINT · COVER', { direction: 'top' })
+      .addTo(relocationLayer);
+    L.circleMarker(end, { radius: 2.5, fillColor: green, color: green, weight: 0, fillOpacity: 1, interactive: false }).addTo(relocationLayer);
   }
 
   function closeDetail() {
     activeAlert = null;
+    lastRelocation = null;
     relocationLayer.clearLayers();
     document.getElementById('detailSheet').classList.remove('open');
+    document.body.classList.remove('detail-open');
+    renderAlertMarkers();
     renderAlertsList();
   }
 
@@ -893,7 +851,7 @@
       await fetch(`${API_BASE}/alerts/${alertId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, note: note || '' })
+        body: JSON.stringify({ status: newStatus, note: note || '', user: myName() })
       });
     } catch (e) {}
 
@@ -925,12 +883,14 @@
   function toggleZones() {
     showZones = !showZones;
     document.getElementById('btnToggleZones').classList.toggle('active', showZones);
+    document.getElementById('btnToggleZones').setAttribute('aria-pressed', showZones);
     renderZones();
   }
 
   function toggleHeatmap() {
     showHeatmap = !showHeatmap;
     document.getElementById('btnToggleHeatmap').classList.toggle('active', showHeatmap);
+    document.getElementById('btnToggleHeatmap').setAttribute('aria-pressed', showHeatmap);
     if (showHeatmap) {
       loadHeatmapLayer();
       heatmapLayer.addTo(map);
@@ -945,6 +905,14 @@
     else map.setView([38.7601, -77.5198], 18);
   }
 
+  // [A.E.R.O. UI] same meaning as before (red inside the fence: check here; green outside: cover), theme colors, softer
+  const heatStyle = f => f.properties.on_site
+    ? { stroke: false, fillColor: css('--high'), fillOpacity: Math.min(0.55, 0.06 + f.properties.likelihood * 0.9) }
+    : { stroke: false, fillColor: css('--reloc'), fillOpacity: 0.08 + (f.properties.likelihood - 0.5) * 0.45 };
+  function restyleHeatmap() {
+    heatmapLayer.eachLayer(l => { if (l.setStyle && l.feature) l.setStyle(heatStyle(l.feature)); else if (l.eachLayer) l.eachLayer(x => x.feature && x.setStyle(heatStyle(x.feature))); });
+  }
+
   async function loadHeatmapLayer() {
     if (heatmapLayer.getLayers().length > 0) return;
     // [A.E.R.O. integration] real F2 heat map from the server; the mock squares below are the fallback
@@ -955,9 +923,7 @@
         L.geoJSON(fc, {
           renderer: L.canvas(),
           // inside the fence: red, strongest at the fence (check here first) · outside: green woods turtles come from
-          style: f => f.properties.on_site
-            ? { stroke: false, fillColor: '#dc2626', fillOpacity: Math.min(0.75, 0.1 + f.properties.likelihood * 1.3) }
-            : { stroke: false, fillColor: '#16a34a', fillOpacity: 0.12 + (f.properties.likelihood - 0.5) * 0.6 },
+          style: heatStyle,
           onEachFeature: (f, layer) => layer.bindTooltip(f.properties.on_site
             ? `Inside the fence: check here (likelihood ${(f.properties.likelihood * 100).toFixed(0)}%)`
             : `Woods turtles come from (habitat ${(f.properties.likelihood * 100).toFixed(0)}%)`),
@@ -973,8 +939,8 @@
 
     mockCells.forEach(cell => {
       L.polygon(cell.coords, {
-        color: '#ea580c',
-        fillColor: '#ea580c',
+        color: css('--review'),
+        fillColor: css('--review'),
         fillOpacity: cell.val * 0.4,
         weight: 1
       }).bindTooltip(`Turtle Likelihood: ${(cell.val * 100).toFixed(0)}% (Near Haul Road)`).addTo(heatmapLayer);
@@ -988,8 +954,11 @@
 
     try {
       const res = await fetch(`${API_BASE}/alerts`);
-      if (res.ok) alerts = await res.json();
+      if (res.ok) { alerts = await res.json(); liveData = true; }
     } catch(e) {}
+    // [A.E.R.O. UI] say so honestly when the server isn't reachable and the mock alerts are showing
+    document.getElementById('liveLabel').innerText = liveData ? 'LIVE' : 'DEMO DATA';
+    document.getElementById('openCountBadge').classList.toggle('demo', !liveData);
     try {
       const resZ = await fetch(`${API_BASE}/zones`);
       if (resZ.ok) zones = await resZ.json();
@@ -1007,19 +976,115 @@
   }
   let fittedToAlerts = false;
 
+  // [A.E.R.O. UI] who is signed in on this device (name typed on the sign-in page)
+  function myName() {
+    const m = document.cookie.match(/(?:^|;\s*)aero_name=([^;]*)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+  function toast(text) {
+    const t = document.getElementById('toast'); t.innerText = text; t.classList.add('on');
+    clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('on'), 4500);
+  }
+
+  // [A.E.R.O. UI] live sync: every phone/laptop on this server checks for changes every 4 s and reloads when
+  // someone else logs something (a status tap or a voice log), so all screens show the same alerts
+  let syncVersion = null;
+  async function syncCheck() {
+    if (!liveData || document.hidden) return;
+    let c;
+    try { const r = await fetch(`${API_BASE}/alerts/changes`); if (!r.ok) return; c = await r.json(); } catch (e) { return; }
+    if (c.version === syncVersion) return;
+    const first = syncVersion === null; syncVersion = c.version;
+    if (first) return;
+    await loadData();
+    if (activeAlert) { const a = alerts.find(x => x.alert_id === activeAlert.alert_id); if (a) { fillDetail(a); renderAlertMarkers(); } }
+    if (c.by && c.by.toLowerCase() !== myName().toLowerCase()) {
+      const st = { relocated: 'relocated', false_positive: 'false alarm', confirmed: 'confirmed', open: 'updated' }[c.status] || 'updated';
+      toast(`${c.label} · ${st} · by ${c.by}`);
+    }
+  }
+  setInterval(syncCheck, 4000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) syncCheck(); });
+
+  // [A.E.R.O. UI] phone sheets: tap the handle, or drag it down, to see the whole map; tap or drag up to bring it back
+  const phoneView = () => innerWidth <= 768;
+  function isSheetDown(kind) { return kind === 'list' ? document.body.classList.contains('sheet-down') : document.getElementById('detailSheet').classList.contains('down'); }
+  function setSheet(kind, down) {
+    if (kind === 'list') document.body.classList.toggle('sheet-down', down);
+    else document.getElementById('detailSheet').classList.toggle('down', down);
+    setTimeout(() => map.invalidateSize(), 280);
+  }
+  document.querySelectorAll('.sheet-handle').forEach(h => {
+    let y0 = null, dragged = false;
+    h.addEventListener('pointerdown', e => { y0 = e.clientY; dragged = false; try { h.setPointerCapture(e.pointerId); } catch (_) {} });
+    h.addEventListener('pointermove', e => { if (y0 !== null && Math.abs(e.clientY - y0) > 12) dragged = true; });
+    h.addEventListener('pointerup', e => { if (y0 !== null && dragged) setSheet(h.dataset.sheet, e.clientY > y0); y0 = null; });
+    h.addEventListener('pointercancel', () => { y0 = null; });
+    h.addEventListener('click', () => { if (dragged) { dragged = false; return; } setSheet(h.dataset.sheet, !isSheetDown(h.dataset.sheet)); });
+  });
+  // the chat window slides the phone sheets out of the way, and puts the alert list back when it closes
+  let chatPushedList = false, chatPushedDetail = false;
+  addEventListener('heyturtle:panel', e => {
+    if (!phoneView()) return;
+    if (e.detail.open) {
+      if (!isSheetDown('list')) { setSheet('list', true); chatPushedList = true; }
+      if (document.getElementById('detailSheet').classList.contains('open') && !isSheetDown('detail')) { setSheet('detail', true); chatPushedDetail = true; }
+    } else {
+      if (chatPushedList) setSheet('list', false);
+      if (chatPushedDetail) setSheet('detail', false);
+      chatPushedList = chatPushedDetail = false;
+    }
+  });
+
+  // [A.E.R.O. UI] A.E.R.O. can work the screen: zoom, open a spot, switch tabs/theme, layers ("zoom in", "show spot 3")
+  const findAlert = id => alerts.find(a => a.alert_id === id) || alerts.find(a => String(a.number) === String(id).replace(/\D/g, ''));
+  function runCommand(c) {
+    const n = Math.max(1, Math.min(4, parseInt(c.value, 10) || 1)), v = String(c.value || '');
+    switch (c.action) {
+      case 'zoom_in': map.zoomIn(n); break;
+      case 'zoom_out': map.zoomOut(n); break;
+      case 'recenter': resetMapView(); break;
+      case 'open_alert': { const a = findAlert(c.alert_id); if (a) { map.setView([a.lat, a.lon], Math.max(map.getZoom(), 19), { animate: !phoneView() }); openDetail(a); } break; }
+      case 'close_alert': closeDetail(); break;
+      case 'layer':
+        if (v.startsWith('boundary') && showZones !== v.endsWith('_on')) toggleZones();
+        if (v.startsWith('fence') && showHeatmap !== v.endsWith('_on')) toggleHeatmap();
+        break;
+      case 'tab': closeDetail(); switchTab(v === 'flights' ? 'planner' : 'alerts'); if (phoneView()) setSheet('list', false); break;
+      case 'filter': { const f = v === 'resolved' ? 'closed' : v === 'open' ? 'open' : 'all';
+        const chip = [...document.querySelectorAll('.filter-chip')].find(x => x.getAttribute('onclick').includes(`'${f}'`));
+        closeDetail(); switchTab('alerts'); if (chip) setFilter(f, chip); break; }
+      case 'theme': applyTheme(v === 'light' ? 'light' : 'dark'); break;
+      case 'list': setSheet('list', v === 'down'); break;
+      case 'chat': window.HeyTurtle && HeyTurtle.hide(); break;
+    }
+  }
+
+  // [A.E.R.O. UI] loading screen (canvas artboard 07) tracks the real loading; ENTER appears once everything is in
+  const loader = window.AeroLoading ? AeroLoading.show({ site: 'Grayson Overlook', onClose: () => map && map.invalidateSize() })
+                                    : { step() {}, ready() {} };
   initMap();
-  loadData();
+  (async function boot() {
+    const safety = setTimeout(() => loader.ready(), 9000);   // never block the demo
+    await loadData();
+    loader.step(0, 'HABITAT MAP · FENCE BAND');
+    if (showHeatmap) { await loadHeatmapLayer(); heatmapLayer.addTo(map); }
+    loader.step(1, `ALERTS · ${alerts.filter(a => a.status === 'open').length} OPEN`);
+    loader.step(2, 'VOICE · CONNECTING');
+    loadAero(ok => { loader.step(3, ok ? 'VOICE · A.E.R.O. ONLINE' : 'VOICE · OFFLINE'); clearTimeout(safety); loader.ready(); });
+  })();
 </script>
 
 <!-- [A.E.R.O. integration] voice assistant: big "hold to talk" button, "Hey Aero" hands-free. Server: turtles/backend/assistant.py -->
 <script>
-  (function loadAero() {
+  function loadAero(done) {
     const s = document.createElement('script');
     s.src = API_BASE + '/hey-turtle.js';
-    s.onload = () => HeyTurtle.init({
-      apiBase: API_BASE,
-      position: 'left',          // sit over the map, not on top of the alert list
+    s.onerror = () => done && done(false);
+    s.onload = () => { HeyTurtle.init({
+      apiBase: API_BASE,         // [A.E.R.O. UI] button placement comes from this page's CSS (left of the zoom buttons)
       getAlertId: () => (activeAlert ? activeAlert.alert_id : null),
+      onCommand: runCommand,   // [A.E.R.O. UI] zoom, open a spot, tabs, theme, layers
       // A.E.R.O. logged something: refresh pins and the open detail panel
       onAlertsChanged: async () => {
         const id = activeAlert && activeAlert.alert_id;
@@ -1033,10 +1098,11 @@
         const a = alerts.find(x => x.alert_id === id);
         if (a) { openDetail(a); map.panTo([a.lat, a.lon]); }
       },
-    });
+    }); done && done(true); };
     document.body.appendChild(s);
-  })();
+  }
 </script>
+
 
 </body>
 </html>
