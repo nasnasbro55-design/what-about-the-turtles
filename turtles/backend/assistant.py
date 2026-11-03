@@ -140,7 +140,8 @@ class AlertStore:
         for i, p in enumerate(json.loads(Path(path).read_text())):
             out.append({"alert_id": p["alert_id"], "number": i + 1, "name": p["label"], "lat": p["lat"], "lon": p["lon"],
                         "status": "open", "species": "", "sex": "", "est_length_in": None, "notes": [], "updated_at": "",
-                        "_reloc": {"box": p["suggestion"], "snapping": p.get("suggestion_snapping")}})
+                        "_reloc": {"box": p["suggestion"], "snapping": p.get("suggestion_snapping")},
+                        **{k: p[k] for k in ("score", "confidence", "sensors", "detection_ids", "thumbnail", "flight_id", "created_at") if k in p}})
         return cls(out)
 
     @classmethod
@@ -534,6 +535,13 @@ def app_router(store: AlertStore, mock_zones: bool):
     @r.get("/alerts")
     def alerts(): return [as_contract(a) for a in store.list()]
 
+    @r.get("/thumbnails/{name}")   # detector crops written by turtles.detection.run_flight beside the pack
+    def thumbnail(name: str):
+        from fastapi.responses import FileResponse
+        p = (getattr(store, "media_dir", None) or Path(".")) / "thumbnails" / Path(name).name
+        if not p.exists(): raise HTTPException(404)
+        return FileResponse(p, media_type="image/jpeg")
+
     @r.get("/alerts/changes")   # tiny poll: every open phone/laptop checks this and reloads when the version moves
     def changes(): return store.last
 
@@ -724,6 +732,7 @@ if __name__ == "__main__":
     ap.add_argument("--reset", action="store_true", help="forget saved field changes (fresh demo)")
     a = ap.parse_args()
     store = AlertStore.from_pack(a.pack) if a.pack else AlertStore.from_alerts(ROOT / "architecture" / "mock" / "alerts.json")
+    if a.pack: store.media_dir = Path(a.pack).parent
     if a.pack: store.load_state(Path(a.pack).with_name(Path(a.pack).stem + "_state.json"), reset=a.reset)
     import uvicorn
     print(f"A.E.R.O.: {len(store.alerts)} alerts, model {MODEL}, "
