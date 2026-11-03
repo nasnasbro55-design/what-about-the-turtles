@@ -613,7 +613,8 @@ def app_router(store: AlertStore, mock_zones: bool):
     return r
 
 
-def create_app(store: AlertStore, mock_zones: bool = False):
+def create_app(store: AlertStore, mock_zones: bool = False, first=None):
+    """first: a router mounted ahead of app_router, so backend/api.py can override GET /alerts and /plan."""
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import FileResponse
@@ -667,6 +668,7 @@ def create_app(store: AlertStore, mock_zones: bool = False):
             return r
         login.__annotations__["request"] = Request   # real class, not the string the __future__ import makes
         app.post("/login")(login)
+    if first is not None: app.include_router(first)
     app.include_router(router(store))
     app.include_router(app_router(store, mock_zones))
     ui = ROOT / "ui_docs"
