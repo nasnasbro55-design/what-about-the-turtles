@@ -102,12 +102,13 @@ def test_ui_assets_exist_and_are_served():
     root = Path(__file__).parents[1] / "turtles"
     app = (root / "ui_docs" / "index.html").read_text()
     src = (root / "backend" / "assistant.py").read_text()
-    scripts = [s.split("?")[0] for s in re.findall(r'<script src="([^"]+)"', app) if not s.startswith("http")]
+    scripts = [s.split("?")[0] for s in re.findall(r'<script src="([^"]+)"', app) if not s.startswith("http") and "API_BASE" not in s]
     fonts = re.findall(r"url\((fonts/[^)]+\.woff2)\)", app)
     assert scripts == ["loading.js"] and len(fonts) >= 5
     for f in scripts + fonts:
         assert (root / "ui_docs" / f).is_file(), f"missing {f}"
     assert '"/loading.js"' in src and '"/fonts/{name}"' in src
+    assert '"/aero-control.js"' in src and "aero-control.js" in app and (root / "ui_docs" / "aero-control.js").is_file()
     assert not re.search(r"[\U0001F300-\U0001FAFF]", app), "no emoji in the A.E.R.O. UI"
 
 
@@ -200,3 +201,34 @@ def test_patch_saves_field_log(tmp_path):
     assert a["species"] == "Eastern box turtle" and a["sex"] == "Male" and a["record"]["scl_mm"] == 142
     s2 = AlertStore.from_alerts(ROOT / "architecture" / "mock" / "alerts.json").load_state(tmp_path / "s.json")
     assert s2.get(aid)["record"]["exam"]["carapace"] == "ABN"
+
+
+def test_control_tool_is_built_from_the_apps_action_list(tmp_path):
+    """Every action the app registers (aero-control.js) becomes something A.E.R.O. can press."""
+    s = store(tmp_path)
+    cat = [{"name": "layer", "say": "Press a map layer button", "args": {"name": "boundary|fence_band", "state": "on|off|toggle"}},
+           {"name": "set_field", "say": "Fill a field in the field log", "args": {"field": "key", "value": "value"}}]
+    c = FakeClaude([tool_call("control_app", {"action": "layer", "args": {"name": "fence_band", "state": "on"}}), say("Fence band is on.")])
+    r = respond(s, "turn on the heat map", None, client=c, catalog=cat)
+    tool = next(t for t in c.seen[0]["tools"] if t["name"] == "control_app")
+    assert tool["input_schema"]["properties"]["action"]["enum"] == ["layer", "set_field"] and "set_field" in tool["description"]
+    assert r["ui"] == [{"action": "layer", "args": {"name": "fence_band", "state": "on"}}]
+    assert any("Open now (2): Spot 1, Spot 2" in str(m["content"]) for m in c.seen[0]["messages"])
+
+
+def test_voice_fills_the_field_log(tmp_path):
+    """update_alert's record merges into the field log; earlier exam answers are kept."""
+    s = store(tmp_path)
+    s.update("spot-1", record={"sex": "Male", "exam": {"carapace": "WNL"}})
+    s.update("spot-1", status="relocated", record={"scl_mm": 142, "exam": {"eyes": "ABN"}, "findings": "left eye swollen"})
+    r = s.get("spot-1")["record"]
+    assert r["sex"] == "Male" and r["scl_mm"] == 142 and r["exam"] == {"carapace": "WNL", "eyes": "ABN"} and r["findings"]
+
+
+def test_screen_command_never_snaps_back_to_the_open_spot(tmp_path):
+    """Spot 4 open, "show me spot 5": the answer focuses spot 5, not the spot that was open before."""
+    s = store(tmp_path)
+    c = FakeClaude([tool_call("control_app", {"action": "open_spot", "args": {"spot": 2}}), say("Done, Spot 2 is open.")])
+    assert respond(s, "show me spot 2", "spot-1", client=c)["alert_id"] == "spot-2"
+    c = FakeClaude([tool_call("control_app", {"action": "layer", "args": {"name": "fence_band", "state": "on"}}), say("Done.")])
+    assert respond(s, "fence band on", "spot-1", client=c)["alert_id"] is None

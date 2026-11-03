@@ -110,6 +110,11 @@
   // If the server has no voice (no key, out of credits, timeout) the device's own voice reads it instead.
   async function speak(t) {
     stopTalking(); t = toFeet(t);
+    // stop listening while A.E.R.O. talks: otherwise the mic hears its own voice and sends it back as a question.
+    // (On iPhone this also frees the speaker from "call" volume.) Barge-in watches the mic separately.
+    if (rec) { rec._drop = true; try { rec.abort(); } catch (e) {} rec = null; }
+    if (hands && !isIOS) setTimeout(() => { if (hands && !rec && speakingNow()) listen('barge'); }, 350);   // stop-words while it talks
+    if (!(vad && hands)) audioMode('playback');
     if (cloudVoice && cfg.voice !== 'browser') {
       audio = audio || new Audio(); audio.setAttribute('playsinline', '');
       let fell = false;
@@ -130,11 +135,39 @@
     if (x.tool === 'get_relocation') return 'Relocation guide · ' + id;
     if (x.tool !== 'control_app' && !i.action) return '';
     return ({ zoom_in: 'Zoomed in', zoom_out: 'Zoomed out', recenter: 'Recentered on the site', open_alert: 'Opened ' + id,
-      close_alert: 'Closed the alert', layer: 'Map layer · ' + (i.value || '').replace('_', ' '), tab: 'Showing ' + (i.value === 'flights' ? 'flight windows' : 'alerts'),
-      filter: 'Filter · ' + i.value, theme: (i.value || 'dark') + ' theme', list: 'Alert list ' + (i.value === 'down' ? 'down' : 'up'), chat: 'Chat hidden' })[i.action] || i.action;
+      close_alert: 'Closed the alert', layer: (/boundary/.test(i.value) ? 'Site boundary' : 'Fence band') + (/_on/.test(i.value) ? ' on' : /_off/.test(i.value) ? ' off' : ' pressed'), tab: 'Showing ' + (i.value === 'flights' ? 'flight windows' : 'alerts'),
+      filter: 'Filter · ' + i.value, theme: (i.value || 'dark') + ' theme', list: 'Alert list ' + (i.value === 'down' ? 'down' : 'up'), chat: 'Chat hidden',
+      locate: 'Showing your location', navigate: 'Navigating to ' + (id || 'the open spot'), stop_navigation: 'Navigation stopped' })[i.action] || i.action;
   }
   function act(t) { if (!t) return; const d = document.createElement('div'); d.className = 'act'; d.textContent = t; $('#ht-log').appendChild(d); $('#ht-log').scrollTop = 1e9; }
-  function runUi(cmds) { (cmds || []).forEach(c => { try { cfg.onCommand && cfg.onCommand(c); } catch (e) { console.warn('A.E.R.O. command', c, e); } window.dispatchEvent(new CustomEvent('heyturtle:command', { detail: c })); }); }
+  // run each command on the page (aero-control.js); its answer ("Fence band on", "No spot 9") is the → line in the chat
+  function runUi(cmds, quiet) {
+    (cmds || []).forEach(c => {
+      let res = null; try { res = cfg.onCommand ? cfg.onCommand(c) : null; } catch (e) { res = "Couldn't: " + e.message; console.warn('A.E.R.O. command', c, e); }
+      if (!quiet || typeof res === 'string') act(typeof res === 'string' ? res : actionText({ tool: 'control_app', input: c }));
+      window.dispatchEvent(new CustomEvent('heyturtle:command', { detail: c }));
+    });
+  }
+
+  // speech-to-text hears spot numbers as sound-alikes ("spot for", "Spotify", "close by 3:00"): fix the common ones
+  const SOUND = { for: 4, fore: 4, four: 4, to: 2, too: 2, two: 2, won: 1, one: 1, tree: 3, three: 3, free: 3, ate: 8, eight: 8,
+                  sex: 6, sicks: 6, six: 6, five: 5, fife: 5, seven: 7, nine: 9, ten: 10 };
+  function fixHeard(t) {
+    return String(t || '')
+      .replace(/\bspotify\b/gi, 'spot five')
+      .replace(/\b(spot|spots|spa|spud|pot|alert|pin)\s+(for|fore|four|to|too|two|won|one|tree|three|free|ate|eight|sex|sicks|six|five|fife|seven|nine|ten)\b/gi, (_, w, n) => 'spot ' + SOUND[n.toLowerCase()])
+      .replace(/\b(open|show|close|go to|take me to|navigate to|guide me to|pull up)\s+(?:by|buy|bye|spa|spot)\s+(\d+)(?::00|\s*o'?clock)?\b/gi, '$1 spot $2')
+      .replace(/\bspot number\s+/gi, 'spot ');
+  }
+  // several guesses per sentence: take the one that is a command we know or names a spot
+  function bestGuess(result) {
+    let best = result[0].transcript, score = -1;
+    for (let i = 0; i < result.length; i++) {
+      const t = fixHeard(result[i].transcript), sc = (localCommand(t) ? 2 : 0) + (/\bspot \d+\b/i.test(t) ? 1 : 0) - i * 0.1;
+      if (sc > score) { score = sc; best = result[i].transcript; }
+    }
+    return best;
+  }
 
   // simple screen commands run instantly on the phone, no server round trip ("zoom in", "show spot 3", "dark mode")
   const NUM = { one: 1, two: 2, three: 3, four: 4, for: 4, five: 5, six: 6, seven: 7, eight: 8, ate: 8, nine: 9, ten: 10 };
@@ -146,82 +179,172 @@
     if ((m = t.match(/^(switch to |turn on |go |use )?(dark|light|night|day) (mode|theme)$/))) return { action: 'theme', value: /dark|night/.test(m[2]) ? 'dark' : 'light' };
     if (/^(show|open|go to|pull up)( me)?( the)? flight(s| windows?)$/.test(t)) return { action: 'tab', value: 'flights' };
     if (/^(show|open|go to|pull up)( me)?( the)?( open)? alerts( list)?$/.test(t)) return { action: 'tab', value: 'alerts' };
-    if ((m = t.match(/^(show|open|go to|pull up|zoom to)( me)?( the)? (spot|alert|pin) (\d+|\w+)$/)) && (+m[5] || NUM[m[5]])) return { action: 'open_alert', alert_id: String(+m[5] || NUM[m[5]]) };
-    if (/^(close|back)( it| the alert| details| that)?$/.test(t)) return { action: 'close_alert' };
+    if ((m = t.match(/^(zoom|zoom in|zoom into|zoom in to|zoom in on|zoom on|zoom to|zoom onto|zoom over to)( the)? (spot|alert|pin) (\d+|\w+)$/)) && (+m[4] || NUM[m[4]])) return { action: 'zoom_to_spot', args: { spot: +m[4] || NUM[m[4]] } };
+    if ((m = t.match(/^(show|open|go to|go back to|pull up|select|bring up|switch to)( me)?( the)?( details| info| information)?( of| for| on)?( the)? (spot|alert|pin) (\d+|\w+)( details| info)?$/)) && (+m[8] || NUM[m[8]])) return { action: 'open_alert', alert_id: String(+m[8] || NUM[m[8]]) };
+    if ((m = t.match(/^(spot|alert|pin) (\d+)$/))) return { action: 'open_alert', alert_id: m[2] };
+    if (/^(close|back)( it| the alert| the spot| details| that| spot \d+)?$/.test(t)) return { action: 'close_alert' };
     if (/^(hide|close)( the)? chat$/.test(t)) return { action: 'chat', value: 'hide' };
-    if ((m = t.match(/^(show|hide|turn on|turn off) (the )?(fence band|heat ?map|boundary|site boundary)$/))) return { action: 'layer', value: (/boundary/.test(m[3]) ? 'boundary' : 'fence') + (/show|on/.test(m[1]) ? '_on' : '_off') };
+    const LAYER = '(fence band|fence|heat ?map|heatmap|boundary|site boundary|outline|site outline)';
+    if ((m = t.match(new RegExp('^(show|hide|turn on|turn off|switch on|switch off|enable|disable) (the )?' + LAYER + '( button| layer)?$'))))
+      return { action: 'layer', value: (/boundary|outline/.test(m[3]) ? 'boundary' : 'fence') + (/show|on|enable/.test(m[1]) ? '_on' : '_off') };
+    if ((m = t.match(new RegExp('^(press|click|tap|hit|toggle|push) (on )?(the )?' + LAYER + '( button)?$'))))
+      return { action: 'layer', value: (/boundary|outline/.test(m[4]) ? 'boundary' : 'fence') + '_toggle' };
+    if (/^(press |click |tap )?(the )?recenter( site)?( button)?$/.test(t)) return { action: 'recenter' };
+    if (/^(where am i|show (me )?my location|find me|my location|show where i am|locate me)$/.test(t)) return { action: 'locate' };
+    if ((m = t.match(/^(take me|guide me|navigate|walk me|lead me|bring me|get me)( back)? to (spot|alert|pin) (\d+|\w+)$/)) && (+m[4] || NUM[m[4]])) return { action: 'navigate', alert_id: String(+m[4] || NUM[m[4]]) };
+    if (/^(press |tap )?(the )?navigate( to turtle)?( button)?$/.test(t)) return { action: 'navigate' };
+    if (/^(stop|cancel|end|exit)( the)? (navigation|navigating|directions|route|guidance)$/.test(t)) return { action: 'stop_navigation' };
+    if (/^(next|go to the next|open the next|next open)( open)?( spot| alert| one)?$/.test(t)) return { action: 'next_spot', args: { which: 'next' } };
+    if (/^(previous|go back|last)( spot| alert| one)?$/.test(t)) return { action: 'next_spot', args: { which: 'previous' } };
+    if (/^(open |show |take me to )?(the )?(nearest|closest)( open)?( spot| alert| one)?$/.test(t)) return { action: 'next_spot', args: { which: 'nearest' } };
+    if ((m = t.match(/^(press|tap|hit|click)( the)? (relocated|confirmed|false alarm)( button)?$/))) return { action: 'press_status', args: { status: m[3].replace(' ', '_') } };
+    if (/^(save|save it|save the log|save the sheet|press save)$/.test(t)) return { action: 'save_sheet' };
+    if (/^(cancel|cancel the sheet|discard|never mind)$/.test(t)) return { action: 'cancel_sheet' };
+    if ((m = t.match(/^(move|pan)( the map)? (north|south|east|west|up|down|left|right)( a lot)?$/))) return { action: 'pan', args: { direction: { up: 'north', down: 'south', left: 'west', right: 'east' }[m[3]] || m[3], amount: m[4] ? 'lot' : 'little' } };
+    if (/^(show|open)( the)? chat$/.test(t)) return { action: 'chat', args: { state: 'show' } };
+    if ((m = t.match(/^(slide|put|move|lower|drop|raise|bring)( the)? (list|alerts|details|panel)( down| up| back)?$/))) return { action: 'sheet', args: { which: /detail/.test(m[3]) ? 'detail' : 'list', state: /up|back|raise|bring/.test(m[1] + (m[4] || '')) ? 'up' : 'down' } };
     return null;
   }
 
+  let inflight = null;   // the request still thinking; a new sentence from you cancels it (you changed your mind)
   async function send(text, logged) {
-    text = (text || '').trim(); if (!text || busy) return; if (!logged) log('u', text);
+    text = fixHeard((text || '').trim()); if (!text) return;
+    if (busy && inflight) { inflight.abort(); $('#ht-log .thinking') && $('#ht-log .thinking').remove(); busy = false; }
+    if (busy) return; if (!logged) log('u', text);
     const quick = localCommand(text);
-    if (quick) { act(actionText(quick)); runUi([quick]); $('#ht-mode').textContent = 'mode: instant (on this device)'; return; }
+    if (quick) { runUi([quick]); $('#ht-mode').textContent = 'mode: instant (on this device)'; return; }
     busy = true; $('#ht-btn').classList.add('busy');
     const think = line('b thinking', 'A.E.R.O.', ''); think.lastChild.textContent = 'thinking'; const dots = document.createElement('span'); dots.className = 'dots'; think.appendChild(dots);
     $('#ht-log').appendChild(think); $('#ht-log').scrollTop = 1e9;
+    const ctrl = inflight = new AbortController();
     try {
-      const r = await fetch((cfg.apiBase || '') + '/assistant', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, alert_id: cfg.getAlertId ? cfg.getAlertId() : null, history: hist.slice(-8), user: userName() }) });
+      let screen = null, catalog = null; try { screen = cfg.getScreen ? cfg.getScreen() : null; catalog = cfg.getCatalog ? cfg.getCatalog() : null; } catch (e) {}
+      const r = await fetch((cfg.apiBase || '') + '/assistant', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+        body: JSON.stringify({ text, alert_id: cfg.getAlertId ? cfg.getAlertId() : null, history: hist.slice(-8), user: userName(), screen, catalog }) });
       const j = await r.json(); think.remove();
       if (!r.ok || j.reply == null) { const m = 'Server error ' + r.status + ': ' + JSON.stringify(j.detail || j).slice(0, 200); log('b', m); $('#ht-mode').textContent = m; busy = false; $('#ht-btn').classList.remove('busy'); return; }
       hist.push({ role: 'user', content: text }, { role: 'assistant', content: j.reply });
-      (j.actions || []).forEach(x => act(actionText(x)));
-      runUi(j.ui);                                   // do it on screen first...
+      (j.actions || []).filter(x => x.tool !== 'control_app').forEach(x => act(actionText(x)));
+      runUi(j.ui);                                   // do it on screen first (each shows what happened)...
       if (j.alerts_changed) { cfg.onAlertsChanged && cfg.onAlertsChanged(); window.dispatchEvent(new CustomEvent('heyturtle:alerts-changed')); }
-      if (j.alert_id && cfg.onFocus && !(j.ui || []).some(c => c.action === 'close_alert')) cfg.onFocus(j.alert_id);
+      if (j.alert_id && cfg.onFocus && !(j.ui || []).length) cfg.onFocus(j.alert_id);   // screen commands already chose the spot
       log('b', j.reply); speak(j.reply); $('#ht-mode').textContent = 'mode: ' + j.mode;   // ...then say it
       window.dispatchEvent(new CustomEvent('heyturtle:reply', { detail: j }));
-    } catch (e) { think.remove(); const m = "I can't reach the A.E.R.O. server. Check the connection."; log('b', m); speak(m); }
+    } catch (e) {
+      think.remove(); if (e.name === 'AbortError') return;   // replaced by what you said next
+      const m = "I can't reach the A.E.R.O. server. Check the connection."; log('b', m); speak(m);
+    }
+    if (inflight === ctrl) inflight = null;
     busy = false; $('#ht-btn').classList.remove('busy');
   }
 
   // ---- listening: tap = talk until you pause, hold = walkie-talkie, hands-free = "Hey Aero ..." ----
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const WAKE = /\b(?:hey|hi|ok|okay|yo)[\s,]+(?:a\.?\s?e\.?\s?r\.?\s?o\.?|aero|aaro|airo|arrow|arrows|ero|hero|zero|aereo|turtle)\b[\s,!.?]*(.*)$/i;
-  let armedAt = 0;
+  // iPhone: while speech recognition holds the mic, iOS plays audio like a phone call (quiet). Before A.E.R.O. talks,
+  // stop listening and switch the page to playback; switch back when it listens again (Safari 16.4+ audioSession).
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  function audioMode(m) { try { if (navigator.audioSession) navigator.audioSession.type = m; } catch (e) {} }
+  const WAKE = /\b(?:hey|hi|ok|okay|yo)[\s,]+(?:a\.?\s?e\.?\s?r\.?\s?o\.?|aero|aaro|airo|arrow|arrows|ero|hero|zero|aereo|ariel|aerial|turtle)\b[\s,!.?]*(.*)$/i;
+  const STOPWORD = /\b(stop|wait|hold on|hang on|hey (aero|arrow|ero)|cancel|never ?mind|enough|quiet|shut up|okay stop)\b/i;
+  const FOLLOW_MS = 30000;   // after A.E.R.O. answers you can keep talking without "Hey Aero" for 30 s
+  let armedAt = 0, lastTurnAt = 0, convTimer = 0;
   const armed = () => performance.now() - armedAt < 8000;
+  const awake = () => armed() || performance.now() - lastTurnAt < FOLLOW_MS;
   const speakingNow = () => (audio && !audio.paused && !audio.ended && /speak\.mp3/.test(audio.src)) || (window.speechSynthesis && speechSynthesis.speaking);
   function setListening(on) {
     listening = on; $('#ht-btn').classList.toggle('live', on || hands);
-    $('#ht-btn .ht-a').textContent = hands ? 'HANDS-FREE' : on ? 'LISTENING' : 'TAP TO TALK';
-    $('#ht-btn .ht-b').textContent = hands ? (armed() ? 'go ahead' : 'say “Hey Aero”') : on ? 'tap again to send' : 'or hold · “Hey Aero”';
+    const [a, b] = hands ? (speakingNow() ? ['SPEAKING', 'talk over me to interrupt'] : awake() ? ['LISTENING', 'just talk'] : ['HANDS-FREE', 'say “Hey Aero”'])
+                         : on ? ['LISTENING', 'tap again to send'] : ['TAP TO TALK', 'or hold · “Hey Aero”'];
+    $('#ht-btn .ht-a').textContent = a; $('#ht-btn .ht-b').textContent = b;
   }
-  // One short listening session at a time (works the same on iPhone Safari, Mac Safari and Chrome).
-  // Tap mode sends what it heard. Hands-free restarts after every pause and only acts on "Hey Aero ..."
-  // (or on the next sentence after a bare "Hey Aero"); it ignores its own voice while A.E.R.O. is talking.
+  // One listening session per sentence, restarted right away (the same on iPhone Safari, Mac Safari and Chrome).
+  // Tap mode sends what it heard. Hands-free (conversation mode) acts on "Hey Aero ...", and for 20 s after every
+  // answer on anything you say. While A.E.R.O. talks the mic is watched for your voice: talk over it to interrupt.
   function listen(mode) {
     if (!SR) { log('b', 'Voice needs Chrome, Edge or Safari. You can type below.'); hands = false; return; }
-    const r = rec = new SR(); r.lang = 'en-US'; r.interimResults = true; r.continuous = false;
+    const r = rec = new SR(); r._mode = mode; r.lang = 'en-US'; r.interimResults = true; r.continuous = false; r.maxAlternatives = 4;
+    audioMode('play-and-record');
     let heard = '', interim = '';
     r.onresult = e => {
+      if (mode === 'barge') {   // while A.E.R.O. talks: only a stop-word counts, everything else is its own echo
+        const said = [...e.results].slice(e.resultIndex).map(x => x[0].transcript).join(' ');
+        if (STOPWORD.test(said)) { r._drop = true; try { r.abort(); } catch (_) {} interrupt(); }
+        return;
+      }
+      if (speakingNow()) r._drop = true;   // part of this was A.E.R.O.'s own voice
       interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript; if (e.results[i].isFinal) heard += t; else interim += t; }
+      for (let i = e.resultIndex; i < e.results.length; i++) { if (e.results[i].isFinal) heard += bestGuess(e.results[i]); else interim += e.results[i][0].transcript; }
       const t = (heard + interim).trim();
       if (mode === 'tap' || (t && !speakingNow())) liveText(t);      // you see what the mic is picking up, live
     };
     r.onend = () => {
       if (rec === r) rec = null;
+      if (mode === 'barge') { if (hands && !r._drop && speakingNow()) setTimeout(() => { if (hands && !rec && speakingNow()) listen('barge'); }, 80); else if (hands) setTimeout(resume, 120); return; }
+      if (r._drop) { if (live) liveDone(''); if (hands) setTimeout(resume, 250); else setListening(false); return; }
       const t = (heard || interim).trim();
       if (mode === 'tap') { liveDone(t); setListening(false); if (t) send(t, true); return; }
       let cmd = '';
-      if (t && !speakingNow() && !busy) {
+      if (t && !speakingNow()) {
         const m = t.match(WAKE);
         if (m) { cmd = m[1].trim(); if (!cmd) { armedAt = performance.now(); liveDone(''); log('b', 'Yes?'); browserSpeak('Yes?'); } }
-        else if (armed()) cmd = t;
+        else if (awake()) cmd = t;
       }
-      if (cmd) { armedAt = 0; liveDone(cmd); send(cmd, true); } else if (live) liveDone('');
-      if (hands) setTimeout(resume, 200); else setListening(false);
+      if (cmd) { armedAt = 0; lastTurnAt = performance.now(); liveDone(cmd); send(cmd, true); } else if (live) liveDone('');
+      if (hands) setTimeout(resume, 60); else setListening(false);
     };
     r.onerror = e => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        hands = false; $('#ht-hf').textContent = 'Hands-free'; setListening(false);
-        log('b', 'Microphone blocked: allow it in Settings, and use https or localhost.');
-      }
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { handsOff(); log('b', 'Microphone blocked: allow it in Settings, and use https or localhost.'); }
     };
-    try { r.start(); setListening(true); } catch (e) { if (mode === 'hands') setTimeout(resume, 600); else setListening(false); }
+    try { r.start(); if (mode !== 'barge') setListening(true); } catch (e) { if (mode === 'hands') setTimeout(resume, 400); else if (mode === 'tap') setListening(false); }
   }
-  function resume() { if (!hands || rec) return; if (speakingNow() || busy) { setTimeout(resume, 300); return; } listen('hands'); setListening(true); }
+  function resume() { if (!hands || rec) return; if (speakingNow() || (isIOS && busy && !inflight)) { setTimeout(resume, 200); return; } listen('hands'); }
+
+  // barge-in: a second, echo-cancelled mic stream watches for your voice while A.E.R.O. is talking
+  let vad = null;
+  async function startVad() {
+    if (vad || !(cfg.bargeIn ?? !isIOS) || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      if (!hands) { stream.getTracks().forEach(t => t.stop()); return; }
+      const ctx = new (window.AudioContext || window.webkitAudioContext)(), an = ctx.createAnalyser(); an.fftSize = 1024;
+      ctx.createMediaStreamSource(stream).connect(an);
+      const buf = new Float32Array(an.fftSize);
+      vad = { stream, ctx, floor: 0.01, over: 0, speakFloor: 0, speakN: 0 };
+      vad.timer = setInterval(() => {
+        an.getFloatTimeDomainData(buf); let e = 0; for (let i = 0; i < buf.length; i++) e += buf[i] * buf[i];
+        const rms = Math.sqrt(e / buf.length);
+        if (!speakingNow()) { vad.floor = vad.floor * 0.97 + rms * 0.03; vad.over = 0; vad.speakN = 0; return; }   // learn the room
+        // the first half second of A.E.R.O. talking teaches it how much of its own voice still leaks through
+        if (vad.speakN < 10) { vad.speakFloor = Math.max(vad.speakFloor * 0.9, rms); vad.speakN++; return; }
+        const need = Math.max(0.04, vad.floor * 4, vad.speakFloor * 1.9);
+        vad.over = rms > need ? vad.over + 1 : Math.max(0, vad.over - 1);
+        if (vad.over >= 7) { vad.over = 0; interrupt(); }   // ~0.35 s of you talking over it
+      }, 50);
+    } catch (e) { console.warn('A.E.R.O.: barge-in unavailable', e); }
+  }
+  function stopVad() { if (!vad) return; clearInterval(vad.timer); vad.stream.getTracks().forEach(t => t.stop()); vad.ctx.close().catch(() => {}); vad = null; }
+  function interrupt() {
+    if (!speakingNow()) return;
+    stopTalking(); lastTurnAt = performance.now(); act('You interrupted');
+    if (rec) { rec._drop = true; try { rec.abort(); } catch (e) {} rec = null; }
+    setListening(true); setTimeout(resume, 150);
+  }
+
+  function handsOn() {
+    if (hands) return;
+    hands = true; $('#ht-hf').textContent = 'Hands-free on'; lastTurnAt = performance.now();
+    log('b', 'Hands-free on. Talk to me now; after a pause, start with "Hey Aero". ' + ((cfg.bargeIn ?? !isIOS) ? 'Talk over me to interrupt.' : 'Tap the shield to interrupt me.'));
+    startVad(); setTimeout(resume, 250);
+    convTimer = setInterval(() => {
+      if (speakingNow()) lastTurnAt = performance.now();
+      else if (rec && rec._mode === 'barge') { rec._drop = true; try { rec.abort(); } catch (e) {} }   // done talking: back to normal listening
+      setListening(listening);
+    }, 300);
+  }
+  function handsOff() {
+    hands = false; $('#ht-hf').textContent = 'Hands-free'; clearInterval(convTimer); stopVad();
+    try { rec && rec.abort(); } catch (e) {} rec = null; liveDone(''); setListening(false);
+  }
   const startTalk = () => { if (listening) return; stopTalking(); listen('tap'); };
   const stopTalk = () => { try { rec && rec.stop(); } catch (e) {} };
 
@@ -267,7 +390,7 @@
       // tap: listen until you pause (tap again to send early). Hold past 0.35 s: listen until you let go.
       b.addEventListener('pointerdown', e => {
         e.preventDefault(); unlockAudio();
-        if (hands) { armedAt = performance.now(); setListening(true); liveText(''); return; }
+        if (hands) { stopTalking(); armedAt = performance.now(); setListening(true); resume(); return; }   // tap = "I'm talking to you" / interrupt
         if (listening) { stopTalk(); return; }
         holding = false; startTalk(); holdTimer = setTimeout(() => { holding = true; }, 350);
       });
@@ -282,13 +405,11 @@
       dragger($('#ht-size'), (r0, dx, dy) => { rect.w = r0.w + dx; rect.h = r0.h + dy; });
       let lastPhone = phone();
       addEventListener('resize', () => { if (phone() !== lastPhone) { lastPhone = phone(); rect = null; } if ($('#ht-panel').classList.contains('open')) place(); });
-      $('#ht-hf').onclick = () => { unlockAudio(); hands = !hands; $('#ht-hf').textContent = hands ? 'Hands-free on' : 'Hands-free';
-        if (hands) { stopTalk(); log('b', 'Hands-free on. Say "Hey Aero" and then what you need.'); setTimeout(resume, 250); }
-        else { stopTalk(); liveDone(''); setListening(false); } };
+      $('#ht-hf').onclick = () => { unlockAudio(); hands ? handsOff() : handsOn(); };
       const typing = () => ['INPUT', 'TEXTAREA'].includes((document.activeElement || {}).tagName);
       addEventListener('keydown', e => { if (e.code === 'Space' && !typing() && !e.repeat && document.activeElement !== b) { e.preventDefault(); unlockAudio(); holding = true; startTalk(); } });
       addEventListener('keyup', e => { if (e.code === 'Space' && !typing() && holding) { e.preventDefault(); holding = false; stopTalk(); } });
     },
-    send, speak, userName, show, hide,
+    send, speak, userName, show, hide, fixHeard,
   };
 })();
