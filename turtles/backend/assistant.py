@@ -75,7 +75,13 @@ TOOLS = [
          "species": {"type": "string", "description": "e.g. Eastern box turtle, Common snapping turtle"},
          "sex": {"type": "string", "enum": ["Male", "Female", "Unknown"]},
          "est_length_in": {"type": "number", "description": "approximate shell length in inches"},
-         "note": {"type": "string"}}}},
+         "note": {"type": "string"},
+         "record": {"type": "object", "description": "Field log (A.E.R.O. health assessment) values the person actually said, merged "
+                    "into what is already logged: sex, age_class (Adult|Subadult|Juvenile|Hatchling), mass_g, scl_mm (carapace length), "
+                    "width_mm, height_mm, plastron_mm, encounter_type, substrate (Bare dirt|Leaf litter|Grass|Brush|Gravel|Along silt "
+                    "fence|Other), circumstances, exam {posture, respiration, eyes, nares, carapace, plastron, margins, skin, tail, "
+                    "parasites, gait: WNL|ABN|NE}, findings, photos [list], disposition (Relocated off site|Released at site|Admitted to "
+                    "care|Transferred|Held for observation|Other), disposition_location. Never fill what they didn't say."}}}},
     {"name": "control_app", "description": "Do something on the person's screen right now, the same as pressing the button: "
      "zoom the map in or out, recenter on the site, show their own location, open or close an alert's details, press the "
      "Site boundary or Fence band (heat map) buttons, switch the Alerts / Flight windows tab, filter alerts, switch dark or "
@@ -158,6 +164,12 @@ class AlertStore:
         if a is None: return None
         note = fields.pop("note", None)
         if note: a["notes"].append(note)
+        rec = fields.pop("record", None)
+        if isinstance(rec, dict) and rec:   # field log said out loud: merge, keep what was already there
+            cur = dict(a.get("record") or {}); exam = {**(cur.get("exam") or {}), **(rec.pop("exam", None) or {})}
+            cur.update({k: v for k, v in rec.items() if v not in (None, "", [])}); cur["exam"] = exam if exam else cur.get("exam", {})
+            if not cur.get("exam"): cur.pop("exam", None)
+            a["record"] = cur
         a.update({k: v for k, v in fields.items() if v not in (None, "")})
         return self.touch(a)
 
@@ -198,10 +210,9 @@ def run_tool(store: AlertStore, name: str, args: Dict[str, Any]) -> Dict[str, An
         a = store.update(**args)
         return public(a) if a else {"error": "no such alert"}
     if name == "control_app":
-        if args.get("action") in ("open_alert", "navigate"):
-            a = store.get(args.get("alert_id", ""))
-            if a is None: return {"error": "no such alert"}
-            args["alert_id"] = a["alert_id"]
+        spot = args.get("alert_id") or (args.get("args") or {}).get("spot")
+        if spot not in (None, ""):
+            if store.get(str(spot)) is None: return {"error": f"no spot {spot}"}
         return {"ok": True, "done": "shown on the person's screen"}
     if name == "survey_progress":
         al = store.list(); return {s: sum(a["status"] == s for a in al) for s in STATUSES} | {"total": len(al)}
@@ -227,15 +238,40 @@ def clean_history(history: List[Dict[str, Any]], keep: int = 8) -> List[Dict[str
     return out
 
 
-FAST_NOTE = ("\n- Speed matters: each message starts with [Alerts now: ...], the live list. Answer questions about which alerts "
+FAST_NOTE = ("\n- What they say reaches you through speech-to-text. Numbers often arrive as sound-alikes: for/fore = 4, "
+             "to/too = 2, won = 1, tree = 3, ate = 8, sex/sicks = 6, and \"Spotify\" = \"spot five\". Read the spot number that fits "
+             "the spots that exist and what they are doing; if it is still unclear, ask in a few words."
+             "\n- [Screen now: ...] lists every open spot by distance when GPS is on (open spots by distance); use it for 'closest' and 'where am I'."
+             "\n- To log what someone found by voice, use update_alert (status + record for the field log). Use control_app "
+             "press_status / set_field / save_sheet only when they ask to fill or press the sheet on screen."
+             "\n- Screen commands (zoom, layers, tabs, open a spot, guidance): answer in a few words, like \"Done, Spot 3 is "
+             "open.\" Don't add the alert status or ask about another spot unless they asked."
+             "\n- \"Zoom in to / into / on spot N\" = control_app zoom_to_spot with that spot (it closes any other open spot). "
+             "\"Show me spot N\" = open_spot."
+             "\n- Distances over 1 km: say them in miles and say they are off site; never read out a number like 36,117 meters."
+             "\n- Speed matters: each message starts with [Alerts now: ...], the live list. Answer questions about which alerts "
              "exist or are open straight from it; don't call list_alerts or survey_progress for that.")
 THINKING_OFF = {"type": "disabled"}   # voice needs fast answers; set None if a model rejects this setting
 
 
-def create(client, messages, max_tokens: int = 1024):
+def control_tool(catalog: Optional[List[Dict[str, Any]]]) -> Dict[str, Any]:
+    """control_app built from the app's action list, so every button the app registers is one A.E.R.O. can press."""
+    if not catalog: return next(t for t in TOOLS if t["name"] == "control_app")
+    lines = "\n".join(f"- {c['name']}" + (f"({', '.join(f'{k}: {v}' for k, v in (c.get('args') or {}).items())})" if c.get("args") else "")
+                      + f": {c.get('say', '')}" for c in catalog)
+    return {"name": "control_app", "description": "Press anything on the person's screen right now, exactly like tapping it: "
+            "the map, layers, tabs, filters, spots, phone panels, chat, theme, walking guidance, the responder buttons and every "
+            "field of the field log sheet. Use it whenever they ask to see, show, open, zoom, switch, press, fill, save or be "
+            "taken somewhere. Several calls in one turn run in order. Actions:\n" + lines,
+            "input_schema": {"type": "object", "required": ["action"], "properties": {
+                "action": {"type": "string", "enum": [c["name"] for c in catalog]},
+                "args": {"type": "object", "description": "the action's arguments, e.g. {\"spot\": 4} or {\"name\": \"fence_band\", \"state\": \"on\"}"}}}}
+
+
+def create(client, messages, max_tokens: int = 1024, tools: Optional[List[Dict[str, Any]]] = None):
     """One Messages API call. Thinking off for speed; if the model refuses that setting, retry without it."""
     global THINKING_OFF
-    kw = dict(model=MODEL, max_tokens=max_tokens, tools=TOOLS, messages=messages,
+    kw = dict(model=MODEL, max_tokens=max_tokens, tools=tools or TOOLS, messages=messages,
               system=[{"type": "text", "text": SYSTEM + FAST_NOTE, "cache_control": {"type": "ephemeral"}}])
     if THINKING_OFF:
         try:
@@ -253,19 +289,22 @@ def screen_text(screen: Optional[Dict[str, Any]]) -> str:
 
 
 def ask_claude(store: AlertStore, text: str, alert_id: Optional[str], history: List[Dict[str, str]], client=None,
-               screen: Optional[Dict[str, Any]] = None):
+               screen: Optional[Dict[str, Any]] = None, catalog: Optional[List[Dict[str, Any]]] = None):
     """Tool-use loop. Returns (reply, actions)."""
     if client is None:
         import anthropic
         client = anthropic.Anthropic()
     cur = store.get(alert_id) if alert_id else None
     context = f"[The person is at alert #{cur['number']} ({cur['alert_id']}): {cur['name']}, status {cur['status']}.] " if cur else ""
+    open_now = [a for a in store.list() if a["status"] == "open"]
+    context = f"[Open now ({len(open_now)}): " + (", ".join(f"Spot {a.get('number')}" for a in open_now) or "none") + "] " + context
     context = "[Alerts now: " + "; ".join(f"#{a.get('number')} {a.get('name') or a['alert_id']} ({a['alert_id']}): {a['status']}"
                                          + (f", {a['species']}" if a.get("species") else "") for a in store.list()) + "] " + screen_text(screen) + context
+    tools = [control_tool(catalog) if t["name"] == "control_app" else t for t in TOOLS]
     messages = [*clean_history(history), {"role": "user", "content": context + text}]
     actions, checked = [], False
     for _ in range(6):
-        t0 = time.time(); r = create(client, messages)
+        t0 = time.time(); r = create(client, messages, tools=tools)
         print(f"  claude: {time.time() - t0:.2f}s stop={r.stop_reason} blocks={[b.type for b in r.content]}")
         uses = [b for b in r.content if b.type == "tool_use"]
         if uses and r.stop_reason != "max_tokens":
@@ -288,7 +327,7 @@ def ask_claude(store: AlertStore, text: str, alert_id: Optional[str], history: L
             continue
         if text and not uses: return text, actions
         # cut off (or no words): never send a half-finished tool call back; ask again with room to answer
-        r2 = create(client, messages, max_tokens=1500)
+        r2 = create(client, messages, max_tokens=1500, tools=tools)
         print(f"  claude retry: stop={r2.stop_reason} blocks={[b.type for b in r2.content]}")
         if any(b.type == "tool_use" for b in r2.content) and r2.stop_reason != "max_tokens":
             r = r2; messages.append({"role": "assistant", "content": r.content}); results = []
@@ -334,11 +373,11 @@ def offline(store: AlertStore, text: str, alert_id: Optional[str]):
 
 
 def respond(store: AlertStore, text: str, alert_id: Optional[str] = None, history=None, client=None,
-            screen: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+            screen: Optional[Dict[str, Any]] = None, catalog: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     history = history or []
     try:
         if client is None and not os.environ.get("ANTHROPIC_API_KEY"): raise RuntimeError("no key")
-        reply, actions = ask_claude(store, text, alert_id, history, client, screen); mode = "claude"
+        reply, actions = ask_claude(store, text, alert_id, history, client, screen, catalog); mode = "claude"
     except Exception as e:  # no key, no internet, API error -> keep working
         print(f"  claude unavailable -> offline: {type(e).__name__}: {str(e)[:300]}")
         reply, actions = offline(store, text, alert_id); mode = f"offline ({type(e).__name__})"
@@ -353,7 +392,10 @@ def respond(store: AlertStore, text: str, alert_id: Optional[str] = None, histor
 def ui_cmd(store: AlertStore, cmd: Dict[str, Any]) -> Dict[str, Any]:
     """A control_app call as the widget gets it: "2" or "spot 2" becomes the real alert id."""
     a = store.get(cmd["alert_id"]) if cmd.get("alert_id") else None
-    return {**cmd, "alert_id": a["alert_id"]} if a else dict(cmd)
+    out = {**cmd, "alert_id": a["alert_id"]} if a else dict(cmd)
+    sp = (out.get("args") or {}).get("spot")
+    if sp not in (None, "") and store.get(str(sp)): out["args"] = {**out["args"], "spot": store.get(str(sp)).get("number") or sp}
+    return out
 
 
 try:  # request body for POST /assistant; module level so FastAPI can resolve the type
@@ -363,6 +405,7 @@ try:  # request body for POST /assistant; module level so FastAPI can resolve th
         text: str
         alert_id: Optional[str] = None
         history: List[Dict[str, Any]] = []
+        catalog: Optional[List[Dict[str, Any]]] = None   # every action the app can do (aero-control.js)
         screen: Optional[Dict[str, Any]] = None   # what the phone shows right now (layers on/off, open spot, GPS distance)
         user: str = ""   # who is talking (shown as "NAZ: ..." in the chat, saved with any alert they change)
 
@@ -446,7 +489,7 @@ def router(store: AlertStore):
     @r.post("/assistant")
     def assistant(q: Ask):
         store.actor = q.user; t0 = time.time()
-        try: return respond(store, q.text, q.alert_id, q.history, screen=q.screen)
+        try: return respond(store, q.text, q.alert_id, q.history, screen=q.screen, catalog=q.catalog)
         finally: store.actor = ""; print(f"  reply ready in {time.time() - t0:.2f}s")
 
     @r.get("/assistant/alerts")
@@ -564,7 +607,7 @@ def create_app(store: AlertStore, mock_zones: bool = False):
     @app.middleware("http")
     async def no_stale(request, call_next):   # phones must never show an old page or old alert list
         r = await call_next(request)
-        if request.url.path in ("/", "/hey-turtle.js", "/loading.js"): r.headers["Cache-Control"] = "no-cache"
+        if request.url.path in ("/", "/hey-turtle.js", "/loading.js", "/aero-control.js"): r.headers["Cache-Control"] = "no-cache"
         elif r.headers.get("content-type", "").startswith("application/json"): r.headers["Cache-Control"] = "no-store"
         return r
 
@@ -616,6 +659,7 @@ def create_app(store: AlertStore, mock_zones: bool = False):
     app.get("/demo")(lambda: FileResponse(ui / "hey_turtle_demo.html"))    # bare A.E.R.O. test page
     app.get("/hey-turtle.js")(lambda: FileResponse(ui / "hey-turtle.js", media_type="text/javascript"))
     app.get("/loading.js")(lambda: FileResponse(ui / "loading.js", media_type="text/javascript"))   # A.E.R.O. loading screen
+    app.get("/aero-control.js")(lambda: FileResponse(ui / "aero-control.js", media_type="text/javascript"))   # hands-free control layer
     # home screen app: icon + manifest (public, so iOS can fetch the icon)
     app.get("/manifest.webmanifest")(lambda: FileResponse(ui / "manifest.webmanifest", media_type="application/manifest+json"))
     app.get("/apple-touch-icon.png")(lambda: FileResponse(ui / "icons" / "apple-touch-icon.png", media_type="image/png"))
