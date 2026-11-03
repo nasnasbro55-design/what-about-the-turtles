@@ -223,3 +223,12 @@ def test_voice_fills_the_field_log(tmp_path):
     s.update("spot-1", status="relocated", record={"scl_mm": 142, "exam": {"eyes": "ABN"}, "findings": "left eye swollen"})
     r = s.get("spot-1")["record"]
     assert r["sex"] == "Male" and r["scl_mm"] == 142 and r["exam"] == {"carapace": "WNL", "eyes": "ABN"} and r["findings"]
+
+
+def test_screen_command_never_snaps_back_to_the_open_spot(tmp_path):
+    """Spot 4 open, "show me spot 5": the answer focuses spot 5, not the spot that was open before."""
+    s = store(tmp_path)
+    c = FakeClaude([tool_call("control_app", {"action": "open_spot", "args": {"spot": 2}}), say("Done, Spot 2 is open.")])
+    assert respond(s, "show me spot 2", "spot-1", client=c)["alert_id"] == "spot-2"
+    c = FakeClaude([tool_call("control_app", {"action": "layer", "args": {"name": "fence_band", "state": "on"}}), say("Done.")])
+    assert respond(s, "fence band on", "spot-1", client=c)["alert_id"] is None

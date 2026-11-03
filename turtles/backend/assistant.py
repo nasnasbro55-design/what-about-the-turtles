@@ -50,6 +50,8 @@ How to answer:
   line says so or you just changed it with control_app.
 - "Take me to / guide me to / navigate to" a spot means control_app navigate: the app draws the walking line from their
   GPS position and tracks them there. Distances in [Screen now] are live from their GPS.
+- If what they said makes no sense here (a stray word, background talk, a mishearing), reply only "Sorry, I didn't
+  catch that." or ask one short question with the likely match ("Spot 5?"). Never send app questions to Tanya.
 - Refer to alerts only by spot number and name (for example "Spot 2, the rut"). Never say internal ids like pin-2.
 - Handling rules from Tanya Finch (What About the Turtles): hold a box turtle by the sides with a hand under the
   bottom of the shell, "like a hamburger", upright, never upside down. Snapping turtles, or any turtle that cannot
@@ -382,9 +384,14 @@ def respond(store: AlertStore, text: str, alert_id: Optional[str] = None, histor
         print(f"  claude unavailable -> offline: {type(e).__name__}: {str(e)[:300]}")
         reply, actions = offline(store, text, alert_id); mode = f"offline ({type(e).__name__})"
     print(f"[{mode}] you: {text!r}\n  turtle: {reply!r}")
-    focus = next((x["input"].get("alert_id") for x in reversed(actions) if x["input"].get("alert_id")), alert_id)
+    # the spot the app should show after this answer: the last one an action named. Screen commands decide it
+    # themselves; never fall back to the spot that was open before ("show spot 5" must not snap back to spot 4).
+    named = [x["input"].get("alert_id") or (x["input"].get("args") or {}).get("spot") for x in actions]
+    named = [str(n) for n in named if n not in (None, "")]
+    screen_cmds = any(x["tool"] == "control_app" for x in actions)
+    focus = named[-1] if named else (None if screen_cmds else alert_id)
     f = store.get(focus) if focus else None
-    return {"reply": reply, "mode": mode, "actions": actions, "alert_id": f["alert_id"] if f else alert_id,
+    return {"reply": reply, "mode": mode, "actions": actions, "alert_id": f["alert_id"] if f else (None if screen_cmds else alert_id),
             "alerts_changed": any(x["tool"] == "update_alert" for x in actions),
             "ui": [ui_cmd(store, x["input"]) for x in actions if x["tool"] == "control_app"]}   # the widget carries these out on screen
 

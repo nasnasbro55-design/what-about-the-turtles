@@ -113,6 +113,7 @@
     // stop listening while A.E.R.O. talks: otherwise the mic hears its own voice and sends it back as a question.
     // (On iPhone this also frees the speaker from "call" volume.) Barge-in watches the mic separately.
     if (rec) { rec._drop = true; try { rec.abort(); } catch (e) {} rec = null; }
+    if (hands && !isIOS) setTimeout(() => { if (hands && !rec && speakingNow()) listen('barge'); }, 350);   // stop-words while it talks
     if (!(vad && hands)) audioMode('playback');
     if (cloudVoice && cfg.voice !== 'browser') {
       audio = audio || new Audio(); audio.setAttribute('playsinline', '');
@@ -179,7 +180,8 @@
     if (/^(show|open|go to|pull up)( me)?( the)? flight(s| windows?)$/.test(t)) return { action: 'tab', value: 'flights' };
     if (/^(show|open|go to|pull up)( me)?( the)?( open)? alerts( list)?$/.test(t)) return { action: 'tab', value: 'alerts' };
     if ((m = t.match(/^(zoom|zoom in|zoom into|zoom in to|zoom in on|zoom on|zoom to|zoom onto|zoom over to)( the)? (spot|alert|pin) (\d+|\w+)$/)) && (+m[4] || NUM[m[4]])) return { action: 'zoom_to_spot', args: { spot: +m[4] || NUM[m[4]] } };
-    if ((m = t.match(/^(show|open|go to|pull up)( me)?( the)? (spot|alert|pin) (\d+|\w+)$/)) && (+m[5] || NUM[m[5]])) return { action: 'open_alert', alert_id: String(+m[5] || NUM[m[5]]) };
+    if ((m = t.match(/^(show|open|go to|go back to|pull up|select|bring up|switch to)( me)?( the)?( details| info| information)?( of| for| on)?( the)? (spot|alert|pin) (\d+|\w+)( details| info)?$/)) && (+m[8] || NUM[m[8]])) return { action: 'open_alert', alert_id: String(+m[8] || NUM[m[8]]) };
+    if ((m = t.match(/^(spot|alert|pin) (\d+)$/))) return { action: 'open_alert', alert_id: m[2] };
     if (/^(close|back)( it| the alert| the spot| details| that| spot \d+)?$/.test(t)) return { action: 'close_alert' };
     if (/^(hide|close)( the)? chat$/.test(t)) return { action: 'chat', value: 'hide' };
     const LAYER = '(fence band|fence|heat ?map|heatmap|boundary|site boundary|outline|site outline)';
@@ -225,7 +227,7 @@
       (j.actions || []).filter(x => x.tool !== 'control_app').forEach(x => act(actionText(x)));
       runUi(j.ui);                                   // do it on screen first (each shows what happened)...
       if (j.alerts_changed) { cfg.onAlertsChanged && cfg.onAlertsChanged(); window.dispatchEvent(new CustomEvent('heyturtle:alerts-changed')); }
-      if (j.alert_id && cfg.onFocus && !(j.ui || []).some(c => c.action === 'close_alert')) cfg.onFocus(j.alert_id);
+      if (j.alert_id && cfg.onFocus && !(j.ui || []).length) cfg.onFocus(j.alert_id);   // screen commands already chose the spot
       log('b', j.reply); speak(j.reply); $('#ht-mode').textContent = 'mode: ' + j.mode;   // ...then say it
       window.dispatchEvent(new CustomEvent('heyturtle:reply', { detail: j }));
     } catch (e) {
@@ -243,6 +245,7 @@
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   function audioMode(m) { try { if (navigator.audioSession) navigator.audioSession.type = m; } catch (e) {} }
   const WAKE = /\b(?:hey|hi|ok|okay|yo)[\s,]+(?:a\.?\s?e\.?\s?r\.?\s?o\.?|aero|aaro|airo|arrow|arrows|ero|hero|zero|aereo|ariel|aerial|turtle)\b[\s,!.?]*(.*)$/i;
+  const STOPWORD = /\b(stop|wait|hold on|hang on|hey (aero|arrow|ero)|cancel|never ?mind|enough|quiet|shut up|okay stop)\b/i;
   const FOLLOW_MS = 30000;   // after A.E.R.O. answers you can keep talking without "Hey Aero" for 30 s
   let armedAt = 0, lastTurnAt = 0, convTimer = 0;
   const armed = () => performance.now() - armedAt < 8000;
@@ -259,10 +262,15 @@
   // answer on anything you say. While A.E.R.O. talks the mic is watched for your voice: talk over it to interrupt.
   function listen(mode) {
     if (!SR) { log('b', 'Voice needs Chrome, Edge or Safari. You can type below.'); hands = false; return; }
-    const r = rec = new SR(); r.lang = 'en-US'; r.interimResults = true; r.continuous = false; r.maxAlternatives = 4;
+    const r = rec = new SR(); r._mode = mode; r.lang = 'en-US'; r.interimResults = true; r.continuous = false; r.maxAlternatives = 4;
     audioMode('play-and-record');
     let heard = '', interim = '';
     r.onresult = e => {
+      if (mode === 'barge') {   // while A.E.R.O. talks: only a stop-word counts, everything else is its own echo
+        const said = [...e.results].slice(e.resultIndex).map(x => x[0].transcript).join(' ');
+        if (STOPWORD.test(said)) { r._drop = true; try { r.abort(); } catch (_) {} interrupt(); }
+        return;
+      }
       if (speakingNow()) r._drop = true;   // part of this was A.E.R.O.'s own voice
       interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) { if (e.results[i].isFinal) heard += bestGuess(e.results[i]); else interim += e.results[i][0].transcript; }
@@ -271,6 +279,7 @@
     };
     r.onend = () => {
       if (rec === r) rec = null;
+      if (mode === 'barge') { if (hands && !r._drop && speakingNow()) setTimeout(() => { if (hands && !rec && speakingNow()) listen('barge'); }, 80); else if (hands) setTimeout(resume, 120); return; }
       if (r._drop) { if (live) liveDone(''); if (hands) setTimeout(resume, 250); else setListening(false); return; }
       const t = (heard || interim).trim();
       if (mode === 'tap') { liveDone(t); setListening(false); if (t) send(t, true); return; }
@@ -286,7 +295,7 @@
     r.onerror = e => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { handsOff(); log('b', 'Microphone blocked: allow it in Settings, and use https or localhost.'); }
     };
-    try { r.start(); setListening(true); } catch (e) { if (mode === 'hands') setTimeout(resume, 400); else setListening(false); }
+    try { r.start(); if (mode !== 'barge') setListening(true); } catch (e) { if (mode === 'hands') setTimeout(resume, 400); else if (mode === 'tap') setListening(false); }
   }
   function resume() { if (!hands || rec) return; if (speakingNow() || (isIOS && busy && !inflight)) { setTimeout(resume, 200); return; } listen('hands'); }
 
@@ -307,21 +316,30 @@
         if (!speakingNow()) { vad.floor = vad.floor * 0.97 + rms * 0.03; vad.over = 0; vad.speakN = 0; return; }   // learn the room
         // the first half second of A.E.R.O. talking teaches it how much of its own voice still leaks through
         if (vad.speakN < 10) { vad.speakFloor = Math.max(vad.speakFloor * 0.9, rms); vad.speakN++; return; }
-        const need = Math.max(0.05, vad.floor * 5, vad.speakFloor * 2.4);
-        vad.over = rms > need ? vad.over + 1 : Math.max(0, vad.over - 2);
-        if (vad.over >= 9) { vad.over = 0; interrupt(); }   // ~0.45 s of you clearly talking over it
+        const need = Math.max(0.04, vad.floor * 4, vad.speakFloor * 1.9);
+        vad.over = rms > need ? vad.over + 1 : Math.max(0, vad.over - 1);
+        if (vad.over >= 7) { vad.over = 0; interrupt(); }   // ~0.35 s of you talking over it
       }, 50);
     } catch (e) { console.warn('A.E.R.O.: barge-in unavailable', e); }
   }
   function stopVad() { if (!vad) return; clearInterval(vad.timer); vad.stream.getTracks().forEach(t => t.stop()); vad.ctx.close().catch(() => {}); vad = null; }
-  function interrupt() { stopTalking(); lastTurnAt = performance.now(); act('You interrupted'); setListening(true); resume(); }
+  function interrupt() {
+    if (!speakingNow()) return;
+    stopTalking(); lastTurnAt = performance.now(); act('You interrupted');
+    if (rec) { rec._drop = true; try { rec.abort(); } catch (e) {} rec = null; }
+    setListening(true); setTimeout(resume, 150);
+  }
 
   function handsOn() {
     if (hands) return;
     hands = true; $('#ht-hf').textContent = 'Hands-free on'; lastTurnAt = performance.now();
     log('b', 'Hands-free on. Talk to me now; after a pause, start with "Hey Aero". ' + ((cfg.bargeIn ?? !isIOS) ? 'Talk over me to interrupt.' : 'Tap the shield to interrupt me.'));
     startVad(); setTimeout(resume, 250);
-    convTimer = setInterval(() => { if (speakingNow()) lastTurnAt = performance.now(); setListening(listening); }, 300);
+    convTimer = setInterval(() => {
+      if (speakingNow()) lastTurnAt = performance.now();
+      else if (rec && rec._mode === 'barge') { rec._drop = true; try { rec.abort(); } catch (e) {} }   // done talking: back to normal listening
+      setListening(listening);
+    }, 300);
   }
   function handsOff() {
     hands = false; $('#ht-hf').textContent = 'Hands-free'; clearInterval(convTimer); stopVad();
