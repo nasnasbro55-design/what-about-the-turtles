@@ -37,7 +37,7 @@ A system that tells a crew **where and when to look**, finds turtles in drone ph
 |---|---|---|---|
 | Nasrullah (Naz) Hussain | Team lead, architecture, flight planner, sponsor contact | `turtles/planner/`, `turtles/contracts.py` | [Planner brief](turtles/planner/README.md) |
 | Jake Dwight Chan Israel | Turtle detection model + evaluation | `turtles/detection/` | [Detection brief](turtles/detection/README.md) |
-| Ethan Cooper | Backend: photo ingest, alert logic, API | `turtles/backend/` | [Backend brief](turtles/backend/README.md) |
+| Naz (from Ethan, Nov 3) | Backend: photo ingest, alert logic, API | `turtles/backend/` | [Backend brief](turtles/backend/README.md) |
 | Huy Ngoc Minh Truong | Web app (map + alerts) and demo video | `turtles/ui_docs/` | [App brief](turtles/ui_docs/README.md) |
 | Logan Lavalette (W.A. Hazel) | Drone pilot | – | – |
 
@@ -74,7 +74,7 @@ turtles/
 ├── architecture/     ARCHITECTURE.md + mock data
 ├── planner/          Naz: where and when to fly
 ├── detection/        Jake: turtle detection model
-├── backend/          Ethan: ingest, alert logic, API
+├── backend/          ingest, alert logic, API (Naz)
 ├── ui_docs/          Huy: web app, demo materials
 └── data/             real photos (never committed; shared through Drive)
 tests/                python3 -m pytest -q
