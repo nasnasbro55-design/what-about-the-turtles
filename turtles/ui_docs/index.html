@@ -24,7 +24,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- [A.E.R.O. UI] loading screen (canvas artboard 07) -->
-  <script src="loading.js"></script>
+  <script src="loading.js?v=10"></script>
 
   <style>
     /* [A.E.R.O. UI] fonts bundled in ./fonts so the demo doesn't need venue Wi-Fi for type (OFL licenses in that folder) */
@@ -1176,6 +1176,8 @@
   }
 
   function resetMapView() {
+    // [A.E.R.O. control] recentering means "show me the site": stop following the GPS, or the next fix pulls the map back to you
+    if (typeof followMe !== 'undefined' && followMe) { followMe = false; document.getElementById('btnLocate').classList.remove('active'); }
     // [A.E.R.O. integration] fit to wherever the alerts are (mock lot or the real Grayson spots)
     if (alerts.length) map.fitBounds(L.latLngBounds(alerts.map(a => [a.lat, a.lon])).pad(0.35), { maxZoom: 19 });
     else map.setView([38.7601, -77.5198], 18);
@@ -1502,16 +1504,22 @@
   })();
 </script>
 
+<!-- [A.E.R.O. control] everything on the dashboard A.E.R.O. can press or read (hands-free): turtles/ui_docs/aero-control.js -->
+<script>document.write('<script src="' + API_BASE + '/aero-control.js?v=' + Date.now() + '"><\/script>');</script>
+
 <!-- [A.E.R.O. integration] voice assistant: big "hold to talk" button, "Hey Aero" hands-free. Server: turtles/backend/assistant.py -->
 <script>
   function loadAero(done) {
     const s = document.createElement('script');
-    s.src = API_BASE + '/hey-turtle.js';
+    s.src = API_BASE + '/hey-turtle.js?v=' + Date.now();   // always the newest widget (phones kept old copies)
     s.onerror = () => done && done(false);
     s.onload = () => { HeyTurtle.init({
       apiBase: API_BASE,         // [A.E.R.O. UI] button placement comes from this page's CSS (left of the zoom buttons)
       getAlertId: () => (activeAlert ? activeAlert.alert_id : null),
-      onCommand: runCommand,   // [A.E.R.O. UI] zoom, open a spot, tabs, theme, layers
+      // [A.E.R.O. control] hands-free: every action on the dashboard, what's on screen, and the action list for the server
+      onCommand: c => window.AeroControl ? AeroControl.run(c) : runCommand(c),
+      getScreen: () => window.AeroControl ? AeroControl.screen() : null,
+      getCatalog: () => window.AeroControl ? AeroControl.catalog() : null,
       // A.E.R.O. logged something: refresh pins and the open detail panel
       onAlertsChanged: async () => {
         const id = activeAlert && activeAlert.alert_id;
