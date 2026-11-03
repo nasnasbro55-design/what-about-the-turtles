@@ -27,9 +27,35 @@ Reading XMP needs no special tools: it's plain text inside the JPG. A regex over
 """
 from __future__ import annotations
 
-from turtles.contracts import Frame
+import re
+from pathlib import Path
+
+from turtles.contracts import Frame, Sensor
+from turtles.geo import HFOV_DEG, nadir_yaw
+
+MAX_TILT_DEG = 5.0  # frames whose gimbal is further than this from straight down are skipped
+
+
+def read_xmp(path: str | Path) -> dict[str, str]:
+    """All drone-dji:<Name>="value" tags in one DJI JPG (XMP sits in the first ~100 KB)."""
+    with open(path, "rb") as f:
+        return dict(re.findall(r'drone-dji:(\w+)="([^"]*)"', f.read(300_000).decode("latin1")))
+
+
+def frame_from_photo(path: str | Path, folder: str | Path, site_id: str, flight_id: str, nadir_only: bool = True) -> Frame | None:
+    """Frame for one *_V.JPG, or None if it has no GPS or (nadir_only) the camera wasn't pointed straight down."""
+    x = read_xmp(path)
+    if "GpsLatitude" not in x or (nadir_only and abs(float(x.get("GimbalPitchDegree", -90)) + 90) > MAX_TILT_DEG):
+        return None
+    w, h = (5280, 3956)
+    return Frame(frame_id=Path(path).stem, flight_id=flight_id, site_id=site_id, sensor=Sensor.RGB,
+                 path=str(Path(path).relative_to(folder)), timestamp=x["UTCAtExposure"][:19] + "Z",
+                 lat=float(x["GpsLatitude"]), lon=float(x["GpsLongitude"]), alt_m=float(x["RelativeAltitude"]),
+                 yaw_deg=nadir_yaw(float(x["GimbalYawDegree"]), float(x["GimbalRollDegree"])),
+                 width_px=w, height_px=h, hfov_deg=HFOV_DEG["m3e_wide"])
 
 
 def ingest_flight(folder: str, site_id: str, flight_id: str) -> list[Frame]:
-    """Return one Frame per usable *_V.JPG in folder, sorted by timestamp."""
-    raise NotImplementedError
+    """Return one Frame per usable *_V.JPG in folder (searched recursively), sorted by timestamp."""
+    return sorted((f for p in Path(folder).rglob("*_V.JPG") if (f := frame_from_photo(p, folder, site_id, flight_id))),
+                  key=lambda f: f.timestamp)
