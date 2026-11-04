@@ -160,6 +160,10 @@ def client(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
     monkeypatch.delenv("TURTLE_APP_PASSWORD", raising=False)
     monkeypatch.setattr(pipeline, "real_detector", lambda: two_view_detector)
+    from turtles.planner import planner
+    def offline(*a, **k): raise OSError("tests never call the real weather service")
+    monkeypatch.setattr(planner, "fetch_forecast", offline); api._plan_cache.clear()
+    for v in ("TURTLE_ZONES", "TURTLE_WORK_STARTS"): monkeypatch.delenv(v, raising=False)
     s = api.open_store(str(tmp_path / "t.db"), str(pack_file(tmp_path)))
     c = TestClient(api.create_app(s)); c.store = s; c.tmp = tmp_path
     return c
@@ -211,3 +215,63 @@ def test_api_thermal_check_upgrades_alert(client, monkeypatch):
     def missing(frame, path): raise NotImplementedError
     monkeypatch.setattr(api, "thermal_detector", lambda: missing)
     assert client.post("/alerts/spot-2/thermal", files={"file": ("t.jpg", buf.getvalue())}, data={"lat": 1, "lon": 1}).status_code == 503
+
+
+# --- /zones and /plan on the real site (no mock zones 12 km away) ---------------------------------------
+
+def forecast_from_now(hours=48):
+    """Open-Meteo-shaped forecast starting this hour: sunny, dry, light wind, sun 11:00-22:00 UTC each day."""
+    from datetime import datetime, timedelta, timezone
+    t0 = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    ts = [(t0 + timedelta(hours=i)).strftime("%Y-%m-%dT%H:%M") for i in range(hours)]
+    days = sorted({t[:10] for t in ts})
+    return {"hourly": {"time": ts, "temperature_2m": [20.0] * hours, "soil_temperature_0cm": [15.0] * hours,
+                       "shortwave_radiation": [500.0] * hours, "cloud_cover": [10.0] * hours, "precipitation": [0.0] * hours,
+                       "wind_speed_10m": [3.0] * hours},
+            "daily": {"sunrise": [f"{d}T11:00" for d in days], "sunset": [f"{d}T22:00" for d in days]}}
+
+
+def test_zones_are_the_real_site_without_a_pack(client):
+    z = client.get("/zones").json()
+    assert [x["zone_id"] for x in z] == ["SITE"] and abs(z[0]["polygon"][0][0] - 38.79) < 0.01   # Grayson, not 38.76 mock
+
+
+def test_plan_on_real_site_says_no_work_date(client, monkeypatch):
+    from turtles.planner import planner
+    monkeypatch.setattr(planner, "fetch_forecast", lambda *a, **k: forecast_from_now()); api._plan_cache.clear()
+    w = client.get("/plan").json()
+    assert w and {x["zone_id"] for x in w} == {"SITE"} and w[0]["zone_name"] == "Grayson Overlook site boundary"
+    assert w[0]["reasons"][0].startswith("Active construction (no scheduled work date set)") and w[0]["priority"] == 1.0
+    assert all(" starts " not in x["reasons"][0] for x in w)                      # no invented start date
+    assert (client.tmp / "plan_grayson.json").exists()                            # saved for offline use
+
+
+def test_plan_uses_a_real_work_date_when_given(client, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from turtles.planner import planner
+    monkeypatch.setattr(planner, "fetch_forecast", lambda *a, **k: forecast_from_now()); api._plan_cache.clear()
+    monkeypatch.setenv("TURTLE_WORK_STARTS", (datetime.now(timezone.utc) + timedelta(days=1, hours=12)).strftime("%Y-%m-%dT%H:00:00Z"))
+    assert client.get("/plan").json()[0]["reasons"][0].startswith("Active construction starts ")
+
+
+def test_plan_offline_serves_last_saved_plan(client, monkeypatch):
+    from turtles.planner import planner
+    monkeypatch.setattr(planner, "fetch_forecast", lambda *a, **k: forecast_from_now()); api._plan_cache.clear()
+    good = client.get("/plan").json()
+    def no_wifi(*a, **k): raise OSError("no route to host")
+    monkeypatch.setattr(planner, "fetch_forecast", no_wifi); api._plan_cache.clear()
+    off = client.get("/plan").json()
+    assert [x["window_id"] for x in off] == [x["window_id"] for x in good] and off[0]["reasons"][1].startswith("Offline: forecast from ")
+
+
+def test_plan_offline_with_nothing_saved_is_empty_not_mock(client, monkeypatch):
+    from turtles.planner import planner
+    def no_wifi(*a, **k): raise OSError("no route to host")
+    monkeypatch.setattr(planner, "fetch_forecast", no_wifi); api._plan_cache.clear()
+    assert client.get("/plan").json() == []
+
+
+def test_mock_flag_keeps_sample_zones_and_windows(tmp_path):
+    from fastapi.testclient import TestClient
+    c = TestClient(api.create_app(api.open_store(str(tmp_path / "m.db"), mock=True), mock_zones=True))
+    assert c.get("/zones").json()[0]["site_id"] == "grayson-mock" and c.get("/plan").json()[0]["site_id"] == "grayson-mock"
