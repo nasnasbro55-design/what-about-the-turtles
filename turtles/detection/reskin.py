@@ -173,6 +173,9 @@ def build(work: str, data: str, *opts: str) -> None:
     for s in ("train", "val"): (out / "images" / s).mkdir(parents=True); (out / "labels" / s).mkdir(parents=True)
     (out / "preprocess.txt").write_text("lift\n")
     n = {"pos": 0, "neg": 0, "skinned": 0, "kept": 0}
+    for src in (k for k, v in lab.items() if not v and "_TEST_" in k):        # Test B keeps the no-visible-shell photos too (unscored, as in A)
+        dst = Path(work, "test_b", "flights", "drone_photos", src); dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(Path(data, "flights", "drone_photos", src), dst)
     for src, boxes in sorted((k, v) for k, v in lab.items() if v):
         img, r = cv2.imread(str(Path(data, "flights", "drone_photos", src))), random.Random(src)
         if "_TEST_" in src:
