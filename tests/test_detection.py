@@ -68,3 +68,16 @@ def test_detector_feeds_yolo_bgr(monkeypatch):
     monkeypatch.setattr(detector, "model", lambda: Fake())
     detector.boxes(Image.new("RGB", (640, 640), (200, 10, 5)))
     assert seen[0] == [5, 10, 200]
+
+
+def test_shell_polygons_turn_with_their_tiles():
+    """Segmentation labels: the outline polygon must land on the shell after the tile is rotated."""
+    import cv2, numpy as np
+    from turtles.detection.build_real import turn
+    from turtles.detection.reskin import tile_polys
+    big = np.zeros((1000, 1000, 3), np.uint8); cv2.ellipse(big, (300, 260), (20, 12), 30, 0, 360, (0, 0, 255), -1)
+    m = np.zeros((80, 80), np.uint8); cv2.ellipse(m, (300 - 260, 260 - 220), (20, 12), 30, 0, 360, 1, -1)
+    for k in range(4):
+        t, _ = turn(Image.fromarray(big[100:740, 100:740, ::-1].copy()), [], k)
+        [p] = tile_polys([(260, 220, m)], [[280, 248, 320, 272]], 100, 100, k)
+        cx, cy = p.mean(0).astype(int); assert t.getpixel((int(cx), int(cy)))[0] > 200   # red shell under the polygon center
