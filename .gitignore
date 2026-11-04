@@ -221,3 +221,11 @@ __marimo__/
 .env
 turtles/planner/out/
 turtles/report/out/
+# backend runtime data (photos, crops, database)
+turtles/backend/flights/
+turtles/backend/thermal/
+turtles/backend/thumbnails/
+*.db
+
+# model weights (trained on W.A. Hazel imagery) - OneDrive only
+*.pt

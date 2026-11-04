@@ -140,7 +140,8 @@ class AlertStore:
         for i, p in enumerate(json.loads(Path(path).read_text())):
             out.append({"alert_id": p["alert_id"], "number": i + 1, "name": p["label"], "lat": p["lat"], "lon": p["lon"],
                         "status": "open", "species": "", "sex": "", "est_length_in": None, "notes": [], "updated_at": "",
-                        "_reloc": {"box": p["suggestion"], "snapping": p.get("suggestion_snapping")}})
+                        "_reloc": {"box": p["suggestion"], "snapping": p.get("suggestion_snapping")},
+                        **{k: p[k] for k in ("score", "confidence", "sensors", "detection_ids", "thumbnail", "flight_id", "created_at") if k in p}})
         return cls(out)
 
     @classmethod
@@ -534,6 +535,13 @@ def app_router(store: AlertStore, mock_zones: bool):
     @r.get("/alerts")
     def alerts(): return [as_contract(a) for a in store.list()]
 
+    @r.get("/thumbnails/{name}")   # detector crops written by turtles.detection.run_flight beside the pack
+    def thumbnail(name: str):
+        from fastapi.responses import FileResponse
+        p = (getattr(store, "media_dir", None) or Path(".")) / "thumbnails" / Path(name).name
+        if not p.exists(): raise HTTPException(404)
+        return FileResponse(p, media_type="image/jpeg")
+
     @r.get("/alerts/changes")   # tiny poll: every open phone/laptop checks this and reloads when the version moves
     def changes(): return store.last
 
@@ -562,8 +570,15 @@ def app_router(store: AlertStore, mock_zones: bool):
         site = ROOT / "planner" / "sites" / "grayson.geojson"   # real site: show the traced boundary (no work zones yet)
         if not site.exists(): return []
         ring = json.loads(site.read_text())["features"][0]["geometry"]["coordinates"][0]
-        return [{"zone_id": "SITE", "site_id": "grayson", "name": "Grayson Overlook site boundary",
-                 "polygon": [[round(la, 6), round(lo, 6)] for lo, la in ring], "work": "active construction", "work_starts": None}]
+        out = [{"zone_id": "SITE", "site_id": "grayson", "name": "Grayson Overlook site boundary",
+                "polygon": [[round(la, 6), round(lo, 6)] for lo, la in ring], "work": "active construction", "work_starts": None}]
+        lod = ROOT / "planner" / "sites" / "grayson_lod.geojson"   # Logan's official limits of disturbance (KML, Sep 29)
+        if lod.exists():
+            for i, f in enumerate(json.loads(lod.read_text())["features"], 1):
+                out.append({"zone_id": f"LOD-{i}", "site_id": "grayson", "name": "Limits of disturbance (Logan, Sep 29)",
+                            "polygon": [[round(c[1], 6), round(c[0], 6)] for c in f["geometry"]["coordinates"][0]],
+                            "work": "limits of disturbance", "work_starts": None})
+        return out
 
     @r.get("/plan")
     def plan(): return json.loads((mock / "windows.json").read_text())   # planner windows (sample until live forecast is wired in)
@@ -605,7 +620,8 @@ def app_router(store: AlertStore, mock_zones: bool):
     return r
 
 
-def create_app(store: AlertStore, mock_zones: bool = False):
+def create_app(store: AlertStore, mock_zones: bool = False, first=None):
+    """first: a router mounted ahead of app_router, so backend/api.py can override GET /alerts and /plan."""
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import FileResponse
@@ -659,6 +675,7 @@ def create_app(store: AlertStore, mock_zones: bool = False):
             return r
         login.__annotations__["request"] = Request   # real class, not the string the __future__ import makes
         app.post("/login")(login)
+    if first is not None: app.include_router(first)
     app.include_router(router(store))
     app.include_router(app_router(store, mock_zones))
     ui = ROOT / "ui_docs"
@@ -724,6 +741,7 @@ if __name__ == "__main__":
     ap.add_argument("--reset", action="store_true", help="forget saved field changes (fresh demo)")
     a = ap.parse_args()
     store = AlertStore.from_pack(a.pack) if a.pack else AlertStore.from_alerts(ROOT / "architecture" / "mock" / "alerts.json")
+    if a.pack: store.media_dir = Path(a.pack).parent
     if a.pack: store.load_state(Path(a.pack).with_name(Path(a.pack).stem + "_state.json"), reset=a.reset)
     import uvicorn
     print(f"A.E.R.O.: {len(store.alerts)} alerts, model {MODEL}, "

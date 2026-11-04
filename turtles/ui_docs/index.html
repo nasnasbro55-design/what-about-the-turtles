@@ -801,7 +801,10 @@
 
     zones.forEach(z => {
       const site = z.zone_id === 'SITE';   // [A.E.R.O. UI] site boundary in brand green, work zones in review amber
-      const polygon = L.polygon(z.polygon, {
+      const lod = String(z.zone_id).startsWith('LOD');   // Logan's official limits of disturbance: thin solid neutral line, under the fence line
+      const polygon = L.polygon(z.polygon, lod ? {
+        color: css('--muted'), fill: false, weight: 1.2, opacity: 0.8, interactive: true
+      } : {
         color: site ? css('--accent') : css('--review'),
         fillColor: site ? css('--accent') : css('--review'),
         fillOpacity: site ? 0.03 : 0.05,
@@ -809,9 +812,11 @@
         dashArray: '6, 5',
         interactive: true
       }).addTo(zonesLayer);
+      if (lod) polygon.bringToBack();
 
-      const label = `${z.name} (${z.work.toUpperCase()})` + (z.work_starts ? `<br><small>Starts: ${new Date(z.work_starts).toLocaleDateString()}</small>` : '');
-      polygon.bindTooltip(label, { permanent: z.zone_id !== 'SITE', direction: 'center', className: 'zone-label' });  // [A.E.R.O. integration] site boundary label on hover only
+      const label = lod ? `${z.name}<br><small>Official site limits (KML)</small>`
+        : `${z.name} (${z.work.toUpperCase()})` + (z.work_starts ? `<br><small>Starts: ${new Date(z.work_starts).toLocaleDateString()}</small>` : '');
+      polygon.bindTooltip(label, { permanent: !site && !lod, direction: lod ? 'auto' : 'center', sticky: lod, className: 'zone-label' });  // [A.E.R.O. integration] site + official limits label on hover only
     });
   }
 

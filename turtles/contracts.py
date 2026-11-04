@@ -54,6 +54,7 @@ class Frame:
     width_px: int
     height_px: int
     hfov_deg: float    # horizontal field of view for this camera/mode (see turtles.geo.HFOV_DEG)
+    pitch_deg: float = -90.0   # camera tilt: -90 = straight down, -45 = halfway to the horizon (turtles.geo handles both)
 
 
 @dataclass
