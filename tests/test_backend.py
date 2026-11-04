@@ -233,7 +233,7 @@ def forecast_from_now(hours=48):
 
 def test_zones_are_the_real_site_without_a_pack(client):
     z = client.get("/zones").json()
-    assert [x["zone_id"] for x in z] == ["SITE"] and abs(z[0]["polygon"][0][0] - 38.79) < 0.01   # Grayson, not 38.76 mock
+    assert [x["zone_id"] for x in z][0] == "SITE" and abs(z[0]["polygon"][0][0] - 38.79) < 0.01   # Grayson, not 38.76 mock
 
 
 def test_plan_on_real_site_says_no_work_date(client, monkeypatch):
@@ -275,3 +275,13 @@ def test_mock_flag_keeps_sample_zones_and_windows(tmp_path):
     from fastapi.testclient import TestClient
     c = TestClient(api.create_app(api.open_store(str(tmp_path / "m.db"), mock=True), mock_zones=True))
     assert c.get("/zones").json()[0]["site_id"] == "grayson-mock" and c.get("/plan").json()[0]["site_id"] == "grayson-mock"
+
+
+def test_zones_include_logans_official_limits(client):
+    import json as _j
+    z = {x["zone_id"]: x for x in client.get("/zones").json()}
+    assert set(z) == {"SITE", "LOD-1", "LOD-2"} and z["LOD-1"]["work"] == "limits of disturbance"
+    kml = _j.loads((api.ROOT / "planner" / "sites" / "grayson_lod.geojson").read_text())["features"]
+    assert [len(z[f"LOD-{i}"]["polygon"]) for i in (1, 2)] == [len(f["geometry"]["coordinates"][0]) for f in kml]   # every KML point
+    lat, lon = z["LOD-1"]["polygon"][0]; assert 38.78 < lat < 38.80 and -77.66 < lon < -77.64           # [lat, lon], on site
+    assert {w["zone_id"] for w in client.get("/plan").json()} <= {"SITE"}                                # planner still on the fence line

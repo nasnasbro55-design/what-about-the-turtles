@@ -570,8 +570,15 @@ def app_router(store: AlertStore, mock_zones: bool):
         site = ROOT / "planner" / "sites" / "grayson.geojson"   # real site: show the traced boundary (no work zones yet)
         if not site.exists(): return []
         ring = json.loads(site.read_text())["features"][0]["geometry"]["coordinates"][0]
-        return [{"zone_id": "SITE", "site_id": "grayson", "name": "Grayson Overlook site boundary",
-                 "polygon": [[round(la, 6), round(lo, 6)] for lo, la in ring], "work": "active construction", "work_starts": None}]
+        out = [{"zone_id": "SITE", "site_id": "grayson", "name": "Grayson Overlook site boundary",
+                "polygon": [[round(la, 6), round(lo, 6)] for lo, la in ring], "work": "active construction", "work_starts": None}]
+        lod = ROOT / "planner" / "sites" / "grayson_lod.geojson"   # Logan's official limits of disturbance (KML, Sep 29)
+        if lod.exists():
+            for i, f in enumerate(json.loads(lod.read_text())["features"], 1):
+                out.append({"zone_id": f"LOD-{i}", "site_id": "grayson", "name": "Limits of disturbance (Logan, Sep 29)",
+                            "polygon": [[round(c[1], 6), round(c[0], 6)] for c in f["geometry"]["coordinates"][0]],
+                            "work": "limits of disturbance", "work_starts": None})
+        return out
 
     @r.get("/plan")
     def plan(): return json.loads((mock / "windows.json").read_text())   # planner windows (sample until live forecast is wired in)
