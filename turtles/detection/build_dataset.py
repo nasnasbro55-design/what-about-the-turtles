@@ -9,6 +9,7 @@
 Model M never sees the TEST spots; model F sees everything.
 base pass, per survey photo (all 1,536): 2 negative tiles + 3 synthetic tiles with GMU turtle/shell sprites pasted into
   the real ground (1-3 each), plus leaf/stick decoys that are NOT labeled.
+tanya pass: 1 more synthetic tile per survey photo using Tanya's field photos (sprites/turtle/tanya_*.png).
 drone pass: per labeled shell photo, 12 tiles around each shell + 4 without; per survey photo, 2 more synthetic tiles
   using shells cropped from the drone photos themselves (TEST crops only for F).
 Needs <work>/frames.csv, <work>/labels.json, <work>/sprites/{turtle,distractor,drone}/.
@@ -107,6 +108,7 @@ S: dict = {}
 
 def init(work: str, mode: str) -> None:
     S["gmu"] = load_sprites(Path(work, "sprites", "turtle")); S["drone"] = load_sprites(Path(work, "sprites", "drone_" + mode))
+    S["tanya"] = [load_sprites(Path(work, "sprites", "turtle"))[i] for i, p in enumerate(sorted(Path(work, "sprites", "turtle").glob("*.png"))) if p.name.startswith("tanya_")]
     S["decoy"] = load_sprites(Path(work, "sprites", "distractor"))
 
 
@@ -120,14 +122,14 @@ def do_photo(job: tuple) -> int:
             t, _ = crop(im, r)
             for _ in range(r.choice([0, 0, 1, 2])): paste(t, r.choice(S["decoy"]), r.uniform(15, 60), r)
             save(out, split, f"{name}_neg{i}", t, []); n += 1
-        for i in {"base": range(3), "drone": range(2)}.get(pas, ()):
+        for i in {"base": range(3), "drone": range(2), "tanya": range(1)}.get(pas, ()):
             t, _ = crop(im, r); bx = []
             for _ in range(r.choice([1, 1, 1, 2, 3])):
                 L = r.uniform(*r.choices([(a, b) for _, a, b in SIZE_PX], weights=[p for p, _, _ in SIZE_PX])[0]); xy = edge_xy(t, r, int(L) + 4) if r.random() < 0.4 else None
-                b = paste(t, r.choice(S["gmu" if pas == "base" else "drone"]), L, r, xy, buried=r.random() < 0.35)
+                b = paste(t, r.choice(S[{"base": "gmu", "drone": "drone", "tanya": "tanya"}[pas]]), L, r, xy, buried=r.random() < 0.35)
                 if b: bx.append(b)
             for _ in range(r.choice([0, 1, 2])): paste(t, r.choice(S["decoy"]), r.uniform(15, 60), r)
-            save(out, split, f"{name}_{'syn' if pas == 'base' else 'dsyn'}{i}", t, bx); n += 1
+            save(out, split, f"{name}_{dict(base='syn', drone='dsyn', tanya='tsyn')[pas]}{i}", t, bx); n += 1
     elif boxes:  # a hand-labeled shell photo (photos where nobody could find the shell are skipped, never used as "empty")
         for j, b in enumerate(boxes):
             for i in range(12):
@@ -149,6 +151,7 @@ def main(work: str, data: str, mode: str, *opts: str) -> None:
     jobs = []
     for f in frames:
         name = Path(f["path"]).stem; split = "val" if random.Random(name).random() < VAL else "train"
+        if f["split"] == "survey" and mode == "M" and f["folder"].startswith("03_survey_part3"): continue  # untouched false-alarm test set
         if f["split"] == "survey": jobs.append(("survey", f["path"], [], name, str(out), split, pas))
         elif pas == "drone" and (f["split"] == "train" or mode == "F") and (src := f["path"].split("drone_photos/")[1]) in lab:
             jobs.append(("shell", f["path"], lab[src], name, str(out), split, pas))
