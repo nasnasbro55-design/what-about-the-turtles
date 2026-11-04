@@ -27,13 +27,17 @@ def model():
     return _model
 
 
-MODEL_VERSION = f"rgb-{WEIGHTS.stem}"
+MODEL_VERSION = f"rgb-{WEIGHTS.parent.parent.name if WEIGHTS.parent.name == 'weights' else WEIGHTS.stem}"
+# a model trained on shadow-lifted images (preprocess.txt "lift" beside its run) sees every photo lifted the same way
+PREPROCESS = next((p.read_text().strip() for p in (WEIGHTS.parent.parent / "preprocess.txt", WEIGHTS.with_suffix(".preprocess.txt")) if p.exists()), "")
 
 
-def lift_shadows(bgr):
-    """Brighten dark areas (riprap, fence, pipe shade) without blowing out bright ground: CLAHE on lightness only."""
+def lift_shadows(bgr, cell: int = 330):
+    """Brighten dark areas (riprap, fence, pipe shade) without blowing out bright ground: CLAHE on lightness only.
+    Grid cells are ~cell px whatever the image size, so a full photo and a 640 px tile are lifted alike."""
     import cv2
-    lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB); lab[:, :, 0] = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(16, 16)).apply(lab[:, :, 0])
+    h, w = bgr.shape[:2]; grid = (max(1, round(w / cell)), max(1, round(h / cell)))
+    lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB); lab[:, :, 0] = cv2.createCLAHE(clipLimit=3.0, tileGridSize=grid).apply(lab[:, :, 0])
     return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
 
@@ -44,6 +48,7 @@ def boxes(image, conf: float = MIN_SCORE, batch: int = 16, lift: bool | None = N
     from PIL import Image
     im = np.asarray(Image.open(image).convert("RGB") if isinstance(image, (str, Path)) else image.convert("RGB"))
     im = np.ascontiguousarray(im[:, :, ::-1])   # YOLO treats numpy input as BGR (OpenCV order), the order it trained on
+    if PREPROCESS == "lift": im = np.ascontiguousarray(lift_shadows(im))
     H, W, step = im.shape[0], im.shape[1], int(TILE * (1 - OVERLAP))
     xs = sorted({*range(0, max(W - TILE, 0), step), max(W - TILE, 0)}); ys = sorted({*range(0, max(H - TILE, 0), step), max(H - TILE, 0)})
     origins = [(x, y) for y in ys for x in xs]; out = []

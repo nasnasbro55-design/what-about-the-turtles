@@ -25,6 +25,8 @@ def main(work: str, ds: str, *opts: str) -> None:
         project=str(Path(work, "runs")), name=o.get("--name", f"{ds.lower()}_v1"), exist_ok=True,
         fliplr=0.5, flipud=0.5, degrees=0, scale=0.25, translate=0.1, mosaic=1.0, close_mosaic=8,
         hsv_h=0.01, hsv_s=0.4, hsv_v=0.35, plots=True, seed=7, cache=False, amp=False, fraction=float(o.get("--fraction", 1.0)))
+    if (d / "preprocess.txt").exists():   # detector applies the same preprocessing (shadow lift) to every photo
+        (Path(work, "runs", o.get("--name", f"{ds.lower()}_v1")) / "preprocess.txt").write_text((d / "preprocess.txt").read_text())
 
 
 if __name__ == "__main__":
