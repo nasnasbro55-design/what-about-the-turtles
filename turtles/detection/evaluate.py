@@ -1,6 +1,10 @@
 """Score a trained model -> RESULTS.md. The test protocol is fixed BEFORE looking at any result (PROTOCOL below).
 
-    python3 -m turtles.detection.evaluate <work> "<TNUX Turtles Data>" <weights.pt> [--splits test]
+    python3 -m turtles.detection.evaluate <work> "<TNUX Turtles Data>" <weights.pt> [--splits test] [--lift] [--spots 12_spot8 --no-survey]
+
+Shadow-lift choice (fixed before any test result): compare `--spots 12_spot8 --splits train --no-survey` with and without
+--lift (spot 8 = R's validation spot, never trained on). Adopt --lift for the test only if it finds more spot-8 shells
+while adding at most 1 false alarm per photo at 0.25.
 
 Shells: every hand-labeled shell in the held-out photos (rut, half buried, riprap), scored on the full 5280 x 3956
 photo exactly as in a real flight (sliced 640 px tiles, overlaps merged). False alarms: all 139 photos of survey
@@ -48,14 +52,14 @@ def match(gt: list, preds: list) -> int:
 
 
 def main(work: str, data: str, weights: str, *opts: str) -> None:
-    o = dict(zip(opts, opts[1:])); splits = o.get("--splits", "test").split(",")
-    os.environ["AERO_WEIGHTS"] = weights
+    o = dict(zip(opts, opts[1:])); splits = o.get("--splits", "test").split(","); spots = o.get("--spots")
+    os.environ["AERO_WEIGHTS"] = weights; os.environ["AERO_SHADOW_LIFT"] = "1" if "--lift" in opts else "0"
     from turtles.detection import detector
     frames = list(csv.DictReader(open(Path(work, "frames.csv")))); lab = json.load(open(Path(work, "labels.json")))["labels"]
     stats, spot_found, unseen, rows = defaultdict(lambda: {t: [0, 0, 0] for t in TH}), defaultdict(set), defaultdict(list), []
     for f in frames:
         src = f["path"].split("drone_photos/")[1]
-        if f["split"] not in splits or src not in lab: continue
+        if f["split"] not in splits or src not in lab or (spots and not f["folder"].startswith(spots)): continue
         preds, gt, spot = detector.boxes(local(f, data), conf=min(TH)), lab[src], f["folder"].split("_DJI")[0]
         if not gt: unseen[spot].append(sum(b[4] >= HEADLINE for b in preds))
         for t in TH:
@@ -66,11 +70,13 @@ def main(work: str, data: str, weights: str, *opts: str) -> None:
         rows.append(dict(src=src, gt=gt, preds=[[round(v, 3) for v in b] for b in preds]))
         print(src, len(gt), "shell(s),", sum(b[4] >= HEADLINE for b in preds), "pred(s)", flush=True)
     fa = []
-    for f in (f for f in frames if f["folder"].startswith(HOLDOUT_SURVEY)):
+    for f in (f for f in frames if f["folder"].startswith(HOLDOUT_SURVEY) and "--no-survey" not in opts):
         p = detector.boxes(local(f, data), conf=min(TH)); fa.append(dict(src=local(f, data), preds=[[round(v, 3) for v in b] for b in p]))
-    out = Path(work, "eval", Path(weights).parent.parent.name if Path(weights).parent.name == "weights" else Path(weights).stem); out.mkdir(parents=True, exist_ok=True)
+    out = Path(work, "eval", (Path(weights).parent.parent.name if Path(weights).parent.name == "weights" else Path(weights).stem)
+               + ("_lift" if "--lift" in opts else "") + (f"_{spots}" if spots else "")); out.mkdir(parents=True, exist_ok=True)
     json.dump(dict(rows=rows, survey=fa), open(out / "predictions.json", "w"))
     a = stats["ALL"][HEADLINE]; lo, hi = wilson(a[1], a[0])
+    fp_photo = (a[2] - a[1]) / max(1, len(rows))
     md = [f"# Detector results: `{out.name}`\n", PROTOCOL + "\n",
           f"## Headline: recall {a[1]}/{a[0]} = **{a[1] / a[0]:.0%}** (95% CI {lo:.0%}-{hi:.0%}) at score >= {HEADLINE} - target {TARGET:.0%}: "
           f"**{'MET' if a[1] / a[0] >= TARGET else 'NOT MET'}**\n",
@@ -81,6 +87,7 @@ def main(work: str, data: str, weights: str, *opts: str) -> None:
              f"{(s[t][1] / s[t][2]) if s[t][2] else float('nan'):.0%}") if s[t][0] else "- | -" for t in TH) + " |")
     md += ["", f"**False alarms, survey leg 3 ({len(fa)} photos never trained on, no turtles present):** " + ", ".join(
         f"{sum(sum(b[4] >= t for b in r['preds']) for r in fa) / max(1, len(fa)):.2f} per photo @{t}" for t in TH),
+        "", f"**False alarms in these shell photos @{HEADLINE}:** {fp_photo:.2f} per photo | shadow lift: {'ON' if '--lift' in opts else 'off'}",
         "", "**Spot-level (secondary):** photos of each held-out spot in which the shell was found at least once @0.25: " + ", ".join(
         f"{k}: {len(v)}" for k, v in sorted(spot_found.items())),
         "", "**Photos where no person could find the shell** (not scored; detections @0.25 shown): " + (", ".join(
