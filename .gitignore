@@ -226,3 +226,6 @@ turtles/backend/flights/
 turtles/backend/thermal/
 turtles/backend/thumbnails/
 *.db
+
+# model weights (trained on W.A. Hazel imagery) - OneDrive only
+*.pt
