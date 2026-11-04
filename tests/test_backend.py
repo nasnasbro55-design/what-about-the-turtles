@@ -145,7 +145,7 @@ def test_thumbnail_at_photo_edge_stays_inside(tmp_path):
     from PIL import Image
     img = dji_photo(tmp_path / "a_V.JPG"); out = tmp_path / "t.jpg"
     assert pipeline.make_thumbnail(img, [1040, 780, 1100, 830], out)   # box hangs off the bottom-right corner
-    with Image.open(out) as im: assert min(im.size) > 50
+    with Image.open(out) as im: assert max(im.size) == pipeline.THUMB_OUT_PX and min(im.size) > 50   # small crops scaled up
 
 
 def test_notify_message():
@@ -285,3 +285,26 @@ def test_zones_include_logans_official_limits(client):
     assert [len(z[f"LOD-{i}"]["polygon"]) for i in (1, 2)] == [len(f["geometry"]["coordinates"][0]) for f in kml]   # every KML point
     lat, lon = z["LOD-1"]["polygon"][0]; assert 38.78 < lat < 38.80 and -77.66 < lon < -77.64           # [lat, lon], on site
     assert {w["zone_id"] for w in client.get("/plan").json()} <= {"SITE"}                                # planner still on the fence line
+
+
+def test_copy_spots_keeps_field_records_and_drops_flight_alerts(tmp_path):
+    from turtles.backend.db import copy_spots
+    s = SqliteAlertStore(tmp_path / "old.db"); s.import_pack(pack_file(tmp_path))
+    s.update("spot-2", status="relocated", species="Eastern box turtle", record={"mass_g": 410}, note="moved north")
+    pipeline.run_flight(flight(tmp_path), "grayson", s, detect=two_view_detector)
+    assert len(s.alerts) == 3
+    before = (tmp_path / "old.db").read_bytes()
+    assert copy_spots(tmp_path / "old.db", tmp_path / "demo.db") == 2
+    n = SqliteAlertStore(tmp_path / "demo.db")
+    assert set(n.alerts) == {"spot-1", "spot-2"} and n.flights() == [] and n.get("spot-2")["record"] == {"mass_g": 410}
+    assert n.get("spot-2")["notes"] == ["moved north"] and n.relocation("spot-1")["distance_m"] == 44
+    assert (tmp_path / "old.db").read_bytes() == before                                     # source untouched
+    with pytest.raises(FileExistsError): copy_spots(tmp_path / "old.db", tmp_path / "demo.db")   # never overwrites
+    n.import_pack(pack_file(tmp_path)); assert len(n.alerts) == 2                            # --pack on start adds nothing
+
+
+def test_alert_panel_shows_the_detection_close_up():
+    html = (api.ROOT / "ui_docs" / "index.html").read_text()
+    assert 'id="detailPhoto"' in html and "onerror=" in html.split('id="detailPhoto"')[1].split(">")[0]
+    fill = html.split("function fillDetail(alert)")[1].split("\n  }\n")[0]
+    assert "alert.thumbnail" in fill and 'API_BASE + "/" + alert.thumbnail' in fill and "photoBox.style.display = 'none'" in fill

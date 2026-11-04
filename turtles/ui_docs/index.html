@@ -189,6 +189,9 @@
     .detail-title { display: flex; flex-direction: column; gap: 6px; }
     .detail-num { font-family: var(--font-mono); font-size: 13px; color: var(--accent-text); }
     .detail-name { font-family: var(--font-display); font-weight: 500; font-size: 26px; line-height: 1.15; color: var(--ink); }
+    .detail-photo { margin: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel-2); }
+    .detail-photo img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+    .detail-photo figcaption { padding: 8px 12px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
     .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
     .detail-grid > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .detail-grid .full { grid-column: 1 / -1; }
@@ -250,6 +253,7 @@
       .detail-overlay.down { max-height: calc(150px + env(safe-area-inset-bottom)); overflow: hidden; }
       .detail-header, .detail-body { padding-left: 16px; padding-right: 16px; }
       .detail-name { font-size: 24px; } .relocation-instruction { font-size: 19px; }
+      .detail-photo img { max-height: 30vh; }   /* leave room for the relocation advice in the sheet */
       .leaflet-control-zoom { display: none; }
       html body #ht-dock { right: 14px; bottom: calc(48% + 14px); transition: bottom .25s ease; flex-direction: column-reverse; align-items: center; }
       html body.sheet-down #ht-dock { bottom: calc(92px + env(safe-area-inset-bottom)); }
@@ -484,6 +488,12 @@
           <strong class="detail-name" id="detailAlertId">Alert</strong>
           <span class="alert-sub" id="detailScore"></span>
         </div>
+
+        <!-- [A.E.R.O. UI] drone close-up of the best detection, so the responder knows what to look for on the ground -->
+        <figure class="detail-photo" id="detailPhotoBox" style="display:none">
+          <img id="detailPhoto" alt="Drone close-up of what the detector found at this spot" onerror="this.parentElement.style.display='none'">
+          <figcaption id="detailPhotoCap">Drone close-up</figcaption>
+        </figure>
 
         <div class="detail-grid">
           <div><span class="lbl">Coords</span><span class="val" id="detailCoords"></span></div>
@@ -975,6 +985,12 @@
     const logTxt = logSummary(alert.record, alert);
     document.getElementById('detailLogRow').style.display = logTxt ? '' : 'none'; document.getElementById('detailLog').innerText = logTxt;
     document.getElementById('detailNote').innerText = alert.note || 'No responder note yet';
+    const photo = document.getElementById('detailPhoto'), photoBox = document.getElementById('detailPhotoBox');
+    if (alert.thumbnail) {   // test spots placed by hand have no crop: the panel then shows no photo at all
+      if (photo.dataset.src !== alert.thumbnail) { photo.dataset.src = alert.thumbnail; photo.src = API_BASE + "/" + alert.thumbnail; }   // path from the server (thumbnails/<detection_id>.jpg)
+      photoBox.style.display = '';
+      document.getElementById('detailPhotoCap').innerText = 'Drone close-up · look for this' + (alert.score != null ? ` · ${Math.round(alert.score * 100)}%` : '');
+    } else { photoBox.style.display = 'none'; delete photo.dataset.src; photo.removeAttribute('src'); }
 
     const badge = document.getElementById('detailConfidenceBadge');
     badge.className = `badge-conf badge-${st}`;
@@ -994,6 +1010,12 @@
     }
 
     box.style.display = 'flex';
+    if (rel.target_lat == null || rel.target_lon == null) {   // no habitat map loaded: show the advice ("call Tanya"), draw no arrow
+      document.getElementById('relocationMeta').innerHTML = '';
+      document.getElementById('relocationPrimary').innerText = (rel.reasons || ['No relocation guide for this spot: call Tanya.'])[0];
+      document.getElementById('relocationTip').style.display = 'none'; document.getElementById('relocationReasons').innerHTML = '';
+      lastRelocation = null; return;
+    }
     const m = Math.round(rel.distance_m), deg = Math.round(rel.bearing_deg);
     document.getElementById('relocationMeta').innerHTML = `
       <div><span class="lbl">Distance</span><span class="val">${m} M <small>${Math.round(m / 0.3048)} FT</small></span></div>

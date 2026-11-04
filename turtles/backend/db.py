@@ -150,3 +150,26 @@ class SqliteAlertStore(AlertStore):
     def next_flight_number(self, day: str) -> int:
         """day = 'YYYYMMDD'. Flights that day so far + 1."""
         return self.db.execute("SELECT COUNT(*) FROM flights WHERE flight_id LIKE ?", (f"F-{day}-%",)).fetchone()[0] + 1
+
+
+def copy_spots(src, dst) -> int:
+    """New database dst holding only the hand-placed spots from src (every alert that no flight made), with all their
+    field records, notes and statuses. Flight alerts, frames and detections stay behind. src is only read."""
+    if Path(dst).exists(): raise FileExistsError(f"{dst} already exists: pick a new name (nothing was changed)")
+    old = sqlite3.connect(f"file:{Path(src).resolve()}?mode=ro", uri=True)
+    flights = {r[0] for r in old.execute("SELECT flight_id FROM flights")}
+    spots = [json.loads(r[0]) for r in old.execute("SELECT data FROM alerts ORDER BY number")]
+    spots = [a for a in spots if a.get("flight_id", "") not in flights or not a.get("detection_ids")]
+    old.close()
+    new = SqliteAlertStore(dst)
+    with new.db:
+        for a in spots: new._write(a)
+    new.db.close()
+    return len(spots)
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) != 4 or sys.argv[1] != "copy-spots":
+        sys.exit("usage: python3 -m turtles.backend.db copy-spots <old.db> <new.db>")
+    print(f"copied {copy_spots(sys.argv[2], sys.argv[3])} spots (with their field records) from {sys.argv[2]} to {sys.argv[3]}")
