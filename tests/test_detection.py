@@ -48,3 +48,23 @@ def test_geofence_keeps_site_and_fence_drops_far_away():
     assert on_site(38.7937722, -77.6473238)          # spot 1, inside
     assert on_site(38.7894977, -77.6469393)          # spot 6, woods edge
     assert not on_site(38.80, -77.60)                # ~4 km away
+
+
+def test_real_tiles_rotate_with_their_boxes():
+    from turtles.detection.build_real import turn
+    im = Image.new("RGB", (T, T)); im.putpixel((120, 65), (255, 0, 0))
+    for k in range(4):
+        t, [b] = turn(im, [[100, 50, 140, 80]], k)
+        assert any(t.getpixel((x, y)) == (255, 0, 0) for x in range(b[0], b[2]) for y in range(b[1], b[3]))
+
+
+def test_detector_feeds_yolo_bgr(monkeypatch):
+    """YOLO reads numpy input as BGR; a red photo must reach the model with red in the last channel."""
+    import numpy as np
+    from turtles.detection import detector
+    seen = []
+    class Fake:
+        def predict(self, tiles, **kw): seen.append(tiles[0][0, 0].tolist()); return [type("R", (), {"boxes": type("B", (), {"xyxy": type("X", (), {"tolist": lambda s: []})(), "conf": type("C", (), {"tolist": lambda s: []})()})()})() for _ in tiles]
+    monkeypatch.setattr(detector, "model", lambda: Fake())
+    detector.boxes(Image.new("RGB", (640, 640), (200, 10, 5)))
+    assert seen[0] == [5, 10, 200]

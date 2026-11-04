@@ -34,6 +34,7 @@ def boxes(image, conf: float = MIN_SCORE, batch: int = 16) -> list[tuple[float, 
     import numpy as np, torch, torchvision
     from PIL import Image
     im = np.asarray(Image.open(image).convert("RGB") if isinstance(image, (str, Path)) else image.convert("RGB"))
+    im = np.ascontiguousarray(im[:, :, ::-1])   # YOLO treats numpy input as BGR (OpenCV order), the order it trained on
     H, W, step = im.shape[0], im.shape[1], int(TILE * (1 - OVERLAP))
     xs = sorted({*range(0, max(W - TILE, 0), step), max(W - TILE, 0)}); ys = sorted({*range(0, max(H - TILE, 0), step), max(H - TILE, 0)})
     origins = [(x, y) for y in ys for x in xs]; out = []
