@@ -55,7 +55,7 @@ def main(work: str, data: str, weights: str, *opts: str) -> None:
     o = dict(zip(opts, opts[1:])); splits = o.get("--splits", "test").split(","); spots = o.get("--spots")
     os.environ["AERO_WEIGHTS"] = weights; os.environ["AERO_SHADOW_LIFT"] = "1" if "--lift" in opts else "0"
     from turtles.detection import detector
-    frames = list(csv.DictReader(open(Path(work, "frames.csv")))); lab = json.load(open(Path(work, "labels.json")))["labels"]
+    frames = list(csv.DictReader(open(Path(work, "frames.csv")))); lab = json.load(open(o.get("--labels", Path(work, "labels.json"))))["labels"]
     stats, spot_found, unseen, rows = defaultdict(lambda: {t: [0, 0, 0] for t in TH}), defaultdict(set), defaultdict(list), []
     for f in frames:
         src = f["path"].split("drone_photos/")[1]
@@ -73,7 +73,7 @@ def main(work: str, data: str, weights: str, *opts: str) -> None:
     for f in (f for f in frames if f["folder"].startswith(HOLDOUT_SURVEY) and "--no-survey" not in opts):
         p = detector.boxes(local(f, data), conf=min(TH)); fa.append(dict(src=local(f, data), preds=[[round(v, 3) for v in b] for b in p]))
     out = Path(work, "eval", (Path(weights).parent.parent.name if Path(weights).parent.name == "weights" else Path(weights).stem)
-               + ("_lift" if "--lift" in opts else "") + (f"_{spots}" if spots else "")); out.mkdir(parents=True, exist_ok=True)
+               + ("_lift" if "--lift" in opts else "") + (f"_{spots}" if spots else "") + (f"_{Path(data).name}" if Path(data).name.startswith("test_") else "")); out.mkdir(parents=True, exist_ok=True)
     json.dump(dict(rows=rows, survey=fa), open(out / "predictions.json", "w"))
     a = stats["ALL"][HEADLINE]; lo, hi = wilson(a[1], a[0])
     fp_photo = (a[2] - a[1]) / max(1, len(rows))
