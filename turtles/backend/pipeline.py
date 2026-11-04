@@ -83,7 +83,7 @@ def run_flight(folder, site_id: str, store, flight_id: Optional[str] = None, det
     thumbs_dir = Path(thumbs_dir or Path(getattr(store, "media_dir", None) or ".") / "thumbnails")
     keep = geofence_for(site_id) if geofence == "auto" else geofence
     probe = ingest.ingest_flight(str(folder), site_id, "probe")
-    if not probe: raise ValueError(f"no usable *_V.JPG photos in {folder} (need DJI XMP tags and the gimbal straight down)")
+    if not probe: raise ValueError(f"no usable *_V.JPG photos in {folder} (need DJI XMP tags and the gimbal at -45 or steeper)")
     flight_id = flight_id or ingest.flight_id_for(probe, store.next_flight_number(probe[0].timestamp[:10].replace("-", "")))
     frames = ingest.ingest_flight(str(folder), site_id, flight_id)
     detect = detect or real_detector()

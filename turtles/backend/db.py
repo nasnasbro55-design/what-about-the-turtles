@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS flights (
     frames INTEGER, detections INTEGER, alerts INTEGER, model_version TEXT);
 CREATE TABLE IF NOT EXISTS frames (
     frame_id TEXT PRIMARY KEY, flight_id TEXT, site_id TEXT, sensor TEXT, path TEXT, timestamp TEXT,
-    lat REAL, lon REAL, alt_m REAL, yaw_deg REAL, width_px INTEGER, height_px INTEGER, hfov_deg REAL);
+    lat REAL, lon REAL, alt_m REAL, yaw_deg REAL, width_px INTEGER, height_px INTEGER, hfov_deg REAL, pitch_deg REAL DEFAULT -90);
 CREATE TABLE IF NOT EXISTS detections (
     detection_id TEXT PRIMARY KEY, frame_id TEXT, sensor TEXT, bbox TEXT, score REAL,
     lat REAL, lon REAL, timestamp TEXT, model_version TEXT);
@@ -51,6 +51,8 @@ class SqliteAlertStore(AlertStore):
         self.db = sqlite3.connect(self.path, check_same_thread=False)   # FastAPI runs sync routes on a thread pool
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        if "pitch_deg" not in {r[1] for r in self.db.execute("PRAGMA table_info(frames)")}:   # databases made before tilt support
+            with self.db: self.db.execute("ALTER TABLE frames ADD COLUMN pitch_deg REAL DEFAULT -90")
         rows = self.db.execute("SELECT data FROM alerts ORDER BY number, created_at").fetchall()
         super().__init__([json.loads(r["data"]) for r in rows])
         self._dirty: set = set()
@@ -112,7 +114,7 @@ class SqliteAlertStore(AlertStore):
     def add_frames(self, frames: List[Frame]):
         with self.db:
             self.db.executemany("INSERT OR REPLACE INTO frames VALUES (:frame_id,:flight_id,:site_id,:sensor,:path,:timestamp,"
-                                ":lat,:lon,:alt_m,:yaw_deg,:width_px,:height_px,:hfov_deg)", [row(f) for f in frames])
+                                ":lat,:lon,:alt_m,:yaw_deg,:width_px,:height_px,:hfov_deg,:pitch_deg)", [row(f) for f in frames])
 
     def add_detections(self, dets: List[Detection]):
         with self.db:

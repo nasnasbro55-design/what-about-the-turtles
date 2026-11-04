@@ -5,7 +5,7 @@ They're in each JPG's XMP block as drone-dji:<Name>="value":
 
     GpsLatitude / GpsLongitude -> lat, lon (e.g. "+38.794225136"; standard EXIF GPS is there too)
     RelativeAltitude           -> alt_m, meters above the takeoff point (e.g. "+115.810")
-    GimbalPitchDegree          -> about -90 means straight down; skip frames more than ~5 deg off
+    GimbalPitchDegree          -> pitch_deg; -90 = straight down. Tilted photos down to -45 are kept (geo handles tilt)
     GimbalYawDegree +
     GimbalRollDegree           -> yaw_deg = turtles.geo.nadir_yaw(yaw, roll)   <- REQUIRED, see below
     UTCAtExposure              -> timestamp (e.g. "2026-09-29T16:50:12.890123"; already UTC)
@@ -32,9 +32,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from turtles.contracts import Frame, Sensor
-from turtles.geo import HFOV_DEG, nadir_yaw
+from turtles.geo import HFOV_DEG, MIN_DEPRESSION_DEG, nadir_yaw
 
-MAX_TILT_DEG = 5.0   # frames whose gimbal is further than this from straight down are skipped
+MAX_TILT_DEG = 5.0   # nadir_only: frames further than this from straight down are skipped
+# Default: anything from straight down to MIN_DEPRESSION_DEG (-45). Logan's Oct 24 spot flights were shot at -33..-83;
+# tilt-aware projection puts the same labeled shell within ~1 m across photos (vs 3-14 m if treated as straight down).
 M3E_SIZE = (5280, 3956)
 NEEDED = ("GpsLatitude", "GpsLongitude", "RelativeAltitude", "GimbalYawDegree", "UTCAtExposure")
 
@@ -59,19 +61,20 @@ def utc_iso(s: str) -> str:
     return t.replace(tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def frame_from_photo(path: str | Path, folder: str | Path, site_id: str, flight_id: str, nadir_only: bool = True,
+def frame_from_photo(path: str | Path, folder: str | Path, site_id: str, flight_id: str, nadir_only: bool = False,
                      camera: str = "m3e_wide") -> Frame | None:
-    """Frame for one *_V.JPG, or None if tags are missing or (nadir_only) the camera wasn't pointed straight down.
-    frame_id = the photo's file stem (DJI names are unique per flight; detector ids build on it)."""
+    """Frame for one *_V.JPG, or None if tags are missing or the camera is too flat (pitch above -45, or with
+    nadir_only more than 5 deg from straight down). frame_id = the photo's file stem (detector ids build on it)."""
     x = read_xmp(path)
-    if any(k not in x for k in NEEDED) or (nadir_only and abs(float(x.get("GimbalPitchDegree", -90)) + 90) > MAX_TILT_DEG):
-        return None
+    if any(k not in x for k in NEEDED): return None
+    pitch = float(x.get("GimbalPitchDegree", -90))
+    if pitch > -MIN_DEPRESSION_DEG or (nadir_only and abs(pitch + 90) > MAX_TILT_DEG): return None
     w, h = image_size(path)
     return Frame(frame_id=Path(path).stem, flight_id=flight_id, site_id=site_id, sensor=Sensor.RGB,
                  path=str(Path(path).relative_to(folder)), timestamp=utc_iso(x["UTCAtExposure"]),
                  lat=float(x["GpsLatitude"]), lon=float(x["GpsLongitude"]), alt_m=float(x["RelativeAltitude"]),
                  yaw_deg=nadir_yaw(float(x["GimbalYawDegree"]), float(x.get("GimbalRollDegree", 0))),
-                 width_px=w, height_px=h, hfov_deg=HFOV_DEG[camera])
+                 width_px=w, height_px=h, hfov_deg=HFOV_DEG[camera], pitch_deg=pitch)
 
 
 def flight_photos(folder) -> list[Path]:
@@ -79,9 +82,9 @@ def flight_photos(folder) -> list[Path]:
     return sorted(p for p in Path(folder).rglob("*") if p.is_file() and p.name.upper().endswith("_V.JPG"))
 
 
-def ingest_flight(folder: str, site_id: str, flight_id: str) -> list[Frame]:
+def ingest_flight(folder: str, site_id: str, flight_id: str, nadir_only: bool = False) -> list[Frame]:
     """Return one Frame per usable *_V.JPG in folder (searched recursively), sorted by timestamp."""
-    return sorted((f for p in flight_photos(folder) if (f := frame_from_photo(p, folder, site_id, flight_id))),
+    return sorted((f for p in flight_photos(folder) if (f := frame_from_photo(p, folder, site_id, flight_id, nadir_only))),
                   key=lambda f: (f.timestamp, f.path))
 
 

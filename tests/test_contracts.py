@@ -1,4 +1,5 @@
 """Run from the repo root:  python3 -m pytest -q"""
+import math
 from pathlib import Path
 
 import pytest
@@ -72,3 +73,15 @@ def test_fusion_reproduces_mock_alerts():
     assert [(a.confidence, a.sensors, a.detection_ids) for a in got] == \
            [(a.confidence, a.sensors, a.detection_ids) for a in expected]
     assert got[0].confidence is Confidence.HIGH and Sensor.THERMAL in got[0].sensors
+
+
+def test_tilted_camera_projects_forward():
+    from turtles.geo import ground_offset_m
+    # straight down: identical to the old flat formula
+    g = 2 * 15 * math.tan(math.radians(70.65) / 2) / 5280
+    assert ground_offset_m(15, 70.65, 5280, 3956, 0, -90, 4000, 1000) == pytest.approx(((4000 - 2640) * g, (1978 - 1000) * g))
+    # 15 m up, tilted -45 facing north: image center is 15 m north; -60 facing east: 15/tan(60) m east
+    assert ground_offset_m(15, 70.65, 5280, 3956, 0, -45, 2640, 1978) == pytest.approx((0, 15), abs=1e-9)
+    assert ground_offset_m(15, 70.65, 5280, 3956, 90, -60, 2640, 1978) == pytest.approx((15 / math.tan(math.radians(60)), 0), abs=1e-9)
+    # higher in the image = further away when tilted
+    assert ground_offset_m(15, 70.65, 5280, 3956, 0, -50, 2640, 500)[1] > ground_offset_m(15, 70.65, 5280, 3956, 0, -50, 2640, 3500)[1]
