@@ -29,6 +29,11 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     return max(0, c - h), min(1, c + h)
 
 
+def local(f: dict, data: str) -> str:
+    """frames.csv path rebuilt under this machine's copy of the OneDrive folder (the index may come from another machine)."""
+    return str(Path(data, "flights", "drone_photos", f["path"].split("drone_photos/")[1]))
+
+
 def band(ft: int) -> str:
     return "40-55 ft" if ft < 58 else "60-75 ft" if ft < 80 else "90-100 ft"
 
@@ -51,7 +56,7 @@ def main(work: str, data: str, weights: str, *opts: str) -> None:
     for f in frames:
         src = f["path"].split("drone_photos/")[1]
         if f["split"] not in splits or src not in lab: continue
-        preds, gt, spot = detector.boxes(f["path"], conf=min(TH)), lab[src], f["folder"].split("_DJI")[0]
+        preds, gt, spot = detector.boxes(local(f, data), conf=min(TH)), lab[src], f["folder"].split("_DJI")[0]
         if not gt: unseen[spot].append(sum(b[4] >= HEADLINE for b in preds))
         for t in TH:
             p = [b for b in preds if b[4] >= t]; hit = match(gt, p)
@@ -62,7 +67,7 @@ def main(work: str, data: str, weights: str, *opts: str) -> None:
         print(src, len(gt), "shell(s),", sum(b[4] >= HEADLINE for b in preds), "pred(s)", flush=True)
     fa = []
     for f in (f for f in frames if f["folder"].startswith(HOLDOUT_SURVEY)):
-        p = detector.boxes(f["path"], conf=min(TH)); fa.append(dict(src=f["path"], preds=[[round(v, 3) for v in b] for b in p]))
+        p = detector.boxes(local(f, data), conf=min(TH)); fa.append(dict(src=local(f, data), preds=[[round(v, 3) for v in b] for b in p]))
     out = Path(work, "eval", Path(weights).parent.parent.name if Path(weights).parent.name == "weights" else Path(weights).stem); out.mkdir(parents=True, exist_ok=True)
     json.dump(dict(rows=rows, survey=fa), open(out / "predictions.json", "w"))
     a = stats["ALL"][HEADLINE]; lo, hi = wilson(a[1], a[0])

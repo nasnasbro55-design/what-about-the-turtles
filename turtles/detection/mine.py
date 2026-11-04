@@ -1,6 +1,6 @@
 """Hard-negative mining: run the model on survey photos (no turtles there); every box it fires becomes a negative tile.
 
-    python3 -m turtles.detection.mine <work> <dataset M|F> <weights.pt> [--n 400] [--min 0.15]
+    python3 -m turtles.detection.mine <work> "<TNUX Turtles Data>" <dataset M|F> <weights.pt> [--n 400] [--min 0.15]
 
 Never mines survey leg 3 for model M: that leg is the untouched false-alarm test (evaluate.HOLDOUT_SURVEY).
 Then retrain (continue from these weights). This teaches the model the site's own rocks, clods, pipe ends and shadows.
@@ -12,16 +12,16 @@ from pathlib import Path
 
 from PIL import Image
 
-from turtles.detection.evaluate import HOLDOUT_SURVEY
+from turtles.detection.evaluate import HOLDOUT_SURVEY, local
 
 T = 640
 
 
-def main(work: str, ds: str, weights: str, *opts: str) -> None:
+def main(work: str, data: str, ds: str, weights: str, *opts: str) -> None:
     o = dict(zip(opts, opts[1:])); lo, n = float(o.get("--min", 0.15)), int(o.get("--n", 400))
     os.environ["AERO_WEIGHTS"] = weights
     from turtles.detection import detector
-    sv = [f["path"] for f in csv.DictReader(open(Path(work, "frames.csv"))) if f["split"] == "survey" and not (ds == "M" and f["folder"].startswith(HOLDOUT_SURVEY))]
+    sv = [local(f, data) for f in csv.DictReader(open(Path(work, "frames.csv"))) if f["split"] == "survey" and not (ds == "M" and f["folder"].startswith(HOLDOUT_SURVEY))]
     sv = sv[:: max(1, len(sv) // n)][:n]; out = Path(work, "datasets", ds); added = 0
     for i, path in enumerate(sv, 1):
         bs = [b for b in detector.boxes(path, conf=lo)]
