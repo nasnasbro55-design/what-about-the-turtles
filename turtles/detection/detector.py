@@ -14,7 +14,7 @@ from turtles.geo import pixel_to_latlon
 
 WEIGHTS = Path(os.environ.get("AERO_WEIGHTS", Path.home() / "Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/TNUX Turtles Data/models/aero_turtle.pt"))
 TILE, OVERLAP = 640, 0.2
-MIN_SCORE = 0.25   # fusion's floor; 0.7 = strong
+MIN_SCORE = float(os.environ.get("AERO_MIN_SCORE", 0.25))   # app alert floor (demo: 0.5); evaluate.py always passes its own fixed thresholds
 SHADOW_LIFT = os.environ.get("AERO_SHADOW_LIFT", "0") == "1"  # also run on a shadow-brightened copy (CLAHE), merge boxes
 _model = None
 
