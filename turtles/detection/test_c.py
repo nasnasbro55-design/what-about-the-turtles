@@ -49,9 +49,10 @@ def inside(lat, lon, ring) -> bool:
     return c
 
 
-def turtle_cutouts(work: str, data: str) -> list[np.ndarray]:
-    """RGBA cut-outs (BGR + alpha) of real ~50 ft drone shells, re-skinned with held-out skins only."""
-    lab, te, r, out = json.load(open(Path(work, "labels.json")))["labels"], load_skins(work, "test"), random.Random(11), []
+def turtle_cutouts(work: str, data: str, part: str = "test") -> list[np.ndarray]:
+    """RGBA cut-outs (BGR + alpha) of real ~50 ft drone shells (training spots), re-skinned with `part` skins only
+    ('test' = held-out skins for Test C; 'train' = training skins for training placements). Dark cut-outs dropped."""
+    lab, te, r, out = json.load(open(Path(work, "labels.json")))["labels"], load_skins(work, part), random.Random(11 if part == "test" else 12), []
     rows = {Path(x["path"]).name: x for x in csv.DictReader(open(Path(work, "frames.csv")))}
     for src, boxes in sorted(lab.items()):
         if not boxes or "_TEST_" in src or not 44 <= float(rows[Path(src).name]["alt_ft"]) <= 56: continue
@@ -62,7 +63,9 @@ def turtle_cutouts(work: str, data: str) -> list[np.ndarray]:
             X0, Y0, m = outline(img, b); ys, xs = np.nonzero(m)
             c = new[Y0 + ys.min():Y0 + ys.max() + 1, X0 + xs.min():X0 + xs.max() + 1]
             a = cv2.GaussianBlur(m[ys.min():ys.max() + 1, xs.min():xs.max() + 1].astype(np.float32), (0, 0), 0.6)
-            out.append(np.dstack([c, (a * 255).astype(np.uint8)]))
+            Lc = cv2.cvtColor(c, cv2.COLOR_BGR2LAB)[:, :, 0][a > 0.4]
+            if len(Lc) and Lc.mean() >= 60 and Lc.std() >= 15:                 # skip black, patternless cut-outs (deep-shade sources)
+                out.append(np.dstack([c, (a * 255).astype(np.uint8)]))
     return out
 
 
@@ -113,5 +116,64 @@ def main(work: str, data: str) -> None:
     print(f"Test C: {len(labels)} leg-3 photos with a turtle {0.5}-{2.0} m inside the fence ({len(cut)} held-out-skin cut-outs) -> {out}")
 
 
+def place(img: np.ndarray, f, t: np.ndarray, cx: float, cy: float, r: random.Random) -> tuple[list[int], tuple[int, int, np.ndarray]]:
+    """Paste cut-out t at (cx, cy) in img (in place) at this frame's scale with a NNW sun shadow.
+    Returns its box and (x0, y0, mask) for polygon labels."""
+    g = gsd_m(f.alt_m, f.hfov_deg, f.width_px); L = 0.13 / g * r.uniform(0.85, 1.15)
+    M = cv2.getRotationMatrix2D((t.shape[1] / 2, t.shape[0] / 2), r.uniform(0, 360), L / max(t.shape[:2]))
+    side = int(L * 1.6) + 6; M[:, 2] += side / 2 - np.array([t.shape[1] / 2, t.shape[0] / 2])
+    tw = cv2.warpAffine(t, M, (side, side), flags=cv2.INTER_AREA)
+    a = tw[:, :, 3:].astype(float) / 255; x0, y0 = int(cx - side / 2), int(cy - side / 2)
+    reg = img[y0:y0 + side, x0:x0 + side].astype(float)
+    sv = ground_dir_px(f, SUN_SHADOW_AZ) * 0.35 * L
+    sh = cv2.GaussianBlur(cv2.warpAffine(a[:, :, 0], np.float32([[1, 0, sv[0]], [0, 1, sv[1]]]), (side, side)), (0, 0), 1.2)[:, :, None]
+    reg = reg * (1 - 0.45 * sh * (1 - a)); reg = reg * (1 - a) + tw[:, :, :3] * a
+    img[y0:y0 + side, x0:x0 + side] = np.clip(reg, 0, 255).astype(np.uint8)
+    mk = (a[:, :, 0] > 0.4).astype(np.uint8); ys, xs = np.nonzero(mk)
+    return [int(x0 + xs.min()), int(y0 + ys.min()), int(x0 + xs.max() + 1), int(y0 + ys.max() + 1)], (x0, y0, mk)
+
+
+def build_train(work: str, data: str, *opts: str) -> None:
+    """Training placements (dataset RS): living-turtle cut-outs (TRAINING skins) on survey legs 1-2 - near the site
+    perimeter (0.5-3 m inside) or anywhere on the photo - 2 per photo, every 3rd straight-down photo; 2 tiles each,
+    shadow-lifted, rotated, with outline polygons. Leg 3 and the test spots are never touched. Resumable."""
+    from PIL import Image
+    from turtles.detection.build_dataset import crop
+    from turtles.detection.build_real import turn
+    from turtles.detection.detector import lift_shadows
+    from turtles.detection.reskin import save_seg, tile_polys
+    out, cdir = Path(work, "datasets", "RS"), Path(work, "test_c", "cutouts_train")
+    if not cdir.exists(): cdir.mkdir(parents=True); [cv2.imwrite(str(cdir / f"{i:03d}.png"), c) for i, c in enumerate(turtle_cutouts(work, data, "train"))]
+    cut = [cv2.imread(str(q), cv2.IMREAD_UNCHANGED) for q in sorted(cdir.glob("*.png"))]
+    ring = json.loads(FENCE.read_text())["features"][0]["geometry"]["coordinates"][0]; n = 0
+    photos = sorted(Path(data, "flights", "drone_photos").glob("0[12]_survey_part*/*_V.JPG"))[::3]
+    for p in photos:
+        done = out / "labels" / "train" / f"{p.stem}_place_done"
+        if done.exists(): continue
+        r = random.Random("place" + p.name)
+        try: f = frame_from_photo(p, p.parent, "grayson", "P")
+        except ValueError: f = None                                          # e.g. a photo with a zeroed timestamp
+        if f is None: done.touch(); continue
+        img = cv2.imread(str(p)); W, H = f.width_px, f.height_px; boxes, outs = [], []
+        pts = []
+        for (lo1, la1), (lo2, la2) in zip(ring, ring[1:]):
+            for t_ in np.linspace(0, 1, 12):
+                la, lo = la1 + t_ * (la2 - la1), lo1 + t_ * (lo2 - lo1); x, y = latlon_to_pixel(f, la, lo)
+                if 200 < x < W - 200 and 200 < y < H - 200: pts.append((x, y))
+        for k in range(2):
+            if pts and r.random() < 0.6: x, y = r.choice(pts); x, y = x + r.uniform(-300, 300), y + r.uniform(-300, 300)   # near the perimeter
+            else: x, y = r.uniform(200, W - 200), r.uniform(200, H - 200)                                             # anywhere
+            x, y = min(max(x, 120), W - 120), min(max(y, 120), H - 120)
+            b, o = place(img, f, cut[r.randrange(len(cut))], x, y, r); boxes.append(b); outs.append(o)
+        pil = Image.fromarray(cv2.cvtColor(lift_shadows(img), cv2.COLOR_BGR2RGB))
+        split = "val" if r.random() < 0.08 else "train"
+        for j, b in enumerate(boxes):
+            for i in range(2):
+                t, (x, y) = crop(pil, r, b); k = r.randrange(4); t, _ = turn(t, [], k)
+                save_seg(out, split, f"{p.stem}_place{j}_{i}", t, tile_polys(outs, boxes, x, y, k)); n += 1
+        done.touch(); print(p.name, n, flush=True)
+    print(f"{n} new placement tiles -> {out}")
+
+
 if __name__ == "__main__":
-    main(*sys.argv[1:3])
+    (build_train if "--train" in sys.argv else main)(*[a for a in sys.argv[1:] if a != "--train"][:2])
