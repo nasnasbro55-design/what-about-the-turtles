@@ -64,6 +64,11 @@ def test_db_upgrades_frames_table_made_before_tilt(tmp_path):
     s.add_frames(fr); assert s.frame(fr[0].frame_id).pitch_deg == -90
 
 
+def test_utc_parsing_any_fraction_length():
+    assert {ingest.utc_iso(t) for t in ("2026-11-04T15:00:10.5", "2026-11-04T15:00:10.972224", "2026-11-04T15:00:10Z",
+                                        "2026-11-04T15:00:10")} == {"2026-11-04T15:00:10Z"}
+
+
 def test_flight_id_from_first_photo_date():
     assert ingest.flight_id_for("2026-11-04T15:00:07Z", 2) == "F-20261104-02"
 
