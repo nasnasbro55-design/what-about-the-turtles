@@ -16,7 +16,8 @@ Added or replaced here:
     GET  /alerts?site_id=&status= alerts newest first
     GET  /alerts/{alert_id}       one alert
     POST /alerts/{alert_id}/thermal   FLIR photo + phone lat/lon -> re-fused alert
-    GET  /plan?site_id=           live planner when TURTLE_ZONES points at zones with work dates, else sample windows
+    GET  /plan?site_id=           live 7-day planner on the real site boundary (TURTLE_ZONES / TURTLE_WORK_STARTS for dated
+                                  work areas); last saved plan when offline; sample windows only with --mock
 """
 from __future__ import annotations
 
@@ -76,20 +77,56 @@ def refuse_with_thermal(store: SqliteAlertStore, a: dict, dets: list[Detection])
     return a
 
 
-def live_plan(site_id: str):
-    """Naz's planner on the real 7-day forecast, cached 30 min. None = fall back to the sample windows."""
+SITE_GEOJSON = ROOT / "planner" / "sites" / "grayson.geojson"
+NO_DATE_HORIZON_D = 30   # with no work date, every forecast hour is equally (un)urgent: rank on weather + activity only
+
+
+def site_zones(site_id: str) -> list[Zone]:
+    """Zones the planner covers: TURTLE_ZONES (Hazel's work areas with dates) if set, else the traced site boundary,
+    with TURTLE_WORK_STARTS (ISO UTC) as its work date when there is one."""
     zp = os.environ.get("TURTLE_ZONES")
-    if not zp or not Path(zp).exists(): return None
-    key = (site_id, zp, int(time.time() // 1800))
+    if zp and Path(zp).exists(): return [z for z in load(Zone, zp) if z.site_id == site_id and z.work_starts]
+    if site_id != "grayson" or not SITE_GEOJSON.exists(): return []
+    ring = json.loads(SITE_GEOJSON.read_text())["features"][0]["geometry"]["coordinates"][0]
+    return [Zone(zone_id="SITE", site_id="grayson", name="Grayson Overlook site boundary", work="active construction",
+                 polygon=[[round(la, 6), round(lo, 6)] for lo, la in ring], work_starts=os.environ.get("TURTLE_WORK_STARTS", ""))]
+
+
+def live_plan(site_id: str, cache_dir: Optional[Path] = None):
+    """Naz's planner on the real 7-day forecast for the real site, refreshed every 30 min.
+    No internet (venue Wi-Fi) -> the last good plan from <cache_dir>/plan_<site>.json, marked with its age.
+    None only when there is no zone and no saved plan."""
+    zones = site_zones(site_id)
+    saved = Path(cache_dir) / f"plan_{site_id}.json" if cache_dir else None
+    key = (site_id, os.environ.get("TURTLE_ZONES"), os.environ.get("TURTLE_WORK_STARTS"), int(time.time() // 1800))
     if _plan_cache.get("key") == key: return _plan_cache["val"]
     try:
+        if not zones: raise LookupError(f"no zones for {site_id}")
+        from datetime import datetime, timedelta, timezone
         from turtles.planner.planner import plan
-        zones = [z for z in load(Zone, zp) if z.site_id == site_id and z.work_starts]
-        if not zones: return None
+        undated = [z for z in zones if not z.work_starts]
+        far = (datetime.now(timezone.utc) + timedelta(days=NO_DATE_HORIZON_D)).strftime("%Y-%m-%dT%H:00:00Z")
+        for z in undated: z.work_starts = far
         pts = [p for z in zones for p in z.polygon]
         val = [row(w) for w in plan(site_id, sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts), zones)]
+        names, nodate = {z.zone_id: z.name for z in zones}, {z.zone_id for z in undated}
+        top = max([w["priority"] for w in val if w["zone_id"] in nodate] or [1])
+        for w in val:
+            w["zone_name"] = names.get(w["zone_id"], "")
+            if w["zone_id"] in nodate:   # don't claim a start date nobody gave: say so, and rank relative to the best hour
+                w["reasons"][0] = "Active construction (no scheduled work date set): ranked on weather and turtle activity"
+                w["priority"] = round(w["priority"] / top, 2)
+        val.sort(key=lambda w: (-w["priority"], w["start"]))
+        if saved:
+            try: saved.write_text(json.dumps({"fetched": pipeline.now_utc(), "windows": val}))
+            except OSError: pass
     except Exception as e:
-        print(f"  live planner failed, serving sample windows: {e}"); return None
+        if not (saved and saved.exists()):
+            print(f"  planner unavailable ({e}); no saved plan"); return [] if zones else None
+        old = json.loads(saved.read_text()); val = old["windows"]
+        print(f"  planner unavailable ({e}); serving the plan saved {old['fetched']}")
+        for w in val: w["reasons"] = [*w["reasons"][:1], f"Offline: forecast from {old['fetched']}", *w["reasons"][1:]]
+        return val
     _plan_cache.update(key=key, val=val); return val
 
 
@@ -171,7 +208,9 @@ def create_app(store: SqliteAlertStore, mock_zones: bool = False, mock_detect: b
 
     @first.get("/plan")
     def plan(site_id: str = "grayson"):
-        return live_plan(site_id) or json.loads((MOCK / "windows.json").read_text())
+        if mock_zones: return json.loads((MOCK / "windows.json").read_text())   # --mock: sample windows for the mock lot
+        got = live_plan(site_id, data)
+        return got if got is not None else []
 
     app = assistant.create_app(store, mock_zones=mock_zones, first=first)
     app.include_router(r)
@@ -209,4 +248,4 @@ if __name__ == "__main__":
           f"detector: {'MOCK' if a.mock_detect else 'turtles.detection.detector'}, "
           f"password: {'ON' if os.environ.get('TURTLE_APP_PASSWORD') else 'OFF (set TURTLE_APP_PASSWORD before sharing a link)'} "
           f"-> http://localhost:{a.port}")
-    uvicorn.run(create_app(store, mock_zones=a.mock or not a.pack, mock_detect=a.mock_detect), host="0.0.0.0", port=a.port)
+    uvicorn.run(create_app(store, mock_zones=a.mock, mock_detect=a.mock_detect), host="0.0.0.0", port=a.port)   # real site unless --mock
