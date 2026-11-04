@@ -57,7 +57,7 @@ def image_size(path) -> tuple[int, int]:
 
 def utc_iso(s: str) -> str:
     """'2026-09-29T16:50:12.890123' (DJI UTCAtExposure, already UTC) -> '2026-09-29T16:50:12Z'."""
-    t = datetime.fromisoformat(s.strip().rstrip("Z").split("+")[0])
+    t = datetime.strptime(s.strip()[:19], "%Y-%m-%dT%H:%M:%S")   # drop fractions: Python < 3.11 can't parse every length
     return t.replace(tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
