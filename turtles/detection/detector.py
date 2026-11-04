@@ -15,6 +15,7 @@ from turtles.geo import pixel_to_latlon
 WEIGHTS = Path(os.environ.get("AERO_WEIGHTS", Path.home() / "Library/CloudStorage/OneDrive-GeorgeMasonUniversity-O365Production/TNUX Turtles Data/models/aero_turtle.pt"))
 TILE, OVERLAP = 640, 0.2
 MIN_SCORE = 0.25   # fusion's floor; 0.7 = strong
+SHADOW_LIFT = os.environ.get("AERO_SHADOW_LIFT", "0") == "1"  # also run on a shadow-brightened copy (CLAHE), merge boxes
 _model = None
 
 
@@ -29,8 +30,16 @@ def model():
 MODEL_VERSION = f"rgb-{WEIGHTS.stem}"
 
 
-def boxes(image, conf: float = MIN_SCORE, batch: int = 16) -> list[tuple[float, float, float, float, float]]:
-    """(x0, y0, x1, y1, score) in full-image pixels for one photo (path or PIL image), overlaps merged."""
+def lift_shadows(bgr):
+    """Brighten dark areas (riprap, fence, pipe shade) without blowing out bright ground: CLAHE on lightness only."""
+    import cv2
+    lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB); lab[:, :, 0] = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(16, 16)).apply(lab[:, :, 0])
+    return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+
+def boxes(image, conf: float = MIN_SCORE, batch: int = 16, lift: bool | None = None) -> list[tuple[float, float, float, float, float]]:
+    """(x0, y0, x1, y1, score) in full-image pixels for one photo (path or PIL image), overlaps merged.
+    lift (default $AERO_SHADOW_LIFT): also detect on a shadow-lifted copy and merge both."""
     import numpy as np, torch, torchvision
     from PIL import Image
     im = np.asarray(Image.open(image).convert("RGB") if isinstance(image, (str, Path)) else image.convert("RGB"))
@@ -38,10 +47,11 @@ def boxes(image, conf: float = MIN_SCORE, batch: int = 16) -> list[tuple[float, 
     H, W, step = im.shape[0], im.shape[1], int(TILE * (1 - OVERLAP))
     xs = sorted({*range(0, max(W - TILE, 0), step), max(W - TILE, 0)}); ys = sorted({*range(0, max(H - TILE, 0), step), max(H - TILE, 0)})
     origins = [(x, y) for y in ys for x in xs]; out = []
-    for i in range(0, len(origins), batch):
-        chunk = origins[i:i + batch]
-        for (x, y), r in zip(chunk, model().predict([im[y:y + TILE, x:x + TILE] for x, y in chunk], imgsz=TILE, conf=conf, verbose=False)):
-            out += [(b[0] + x, b[1] + y, b[2] + x, b[3] + y, s) for b, s in zip(r.boxes.xyxy.tolist(), r.boxes.conf.tolist())]
+    for src in ([im, lift_shadows(im)] if (SHADOW_LIFT if lift is None else lift) else [im]):
+        for i in range(0, len(origins), batch):
+            chunk = origins[i:i + batch]
+            for (x, y), r in zip(chunk, model().predict([src[y:y + TILE, x:x + TILE] for x, y in chunk], imgsz=TILE, conf=conf, verbose=False)):
+                out += [(b[0] + x, b[1] + y, b[2] + x, b[3] + y, s) for b, s in zip(r.boxes.xyxy.tolist(), r.boxes.conf.tolist())]
     if not out: return []
     t = torch.tensor(out); keep = torchvision.ops.nms(t[:, :4], t[:, 4], 0.3)
     return [tuple(map(float, t[k])) for k in keep]
