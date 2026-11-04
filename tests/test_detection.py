@@ -21,8 +21,10 @@ def test_ingest_reads_xmp_and_fixes_heading(tmp_path):
     assert abs(f.yaw_deg - 24.1) < 1e-6 and f.timestamp == "2026-10-24T15:22:57Z" and f.alt_m == 15.227
 
 
-def test_ingest_skips_tilted_photos(tmp_path):
-    assert frame_from_photo(_photo(tmp_path, "-59.5"), tmp_path, "grayson", "F1") is None
+def test_ingest_keeps_tilted_photos_down_to_45(tmp_path):
+    assert frame_from_photo(_photo(tmp_path, "-59.5"), tmp_path, "grayson", "F1").pitch_deg == -59.5
+    assert frame_from_photo(_photo(tmp_path, "-30.0"), tmp_path, "grayson", "F1") is None          # too close to the horizon
+    assert frame_from_photo(_photo(tmp_path, "-59.5"), tmp_path, "grayson", "F1", nadir_only=True) is None
 
 
 def test_crop_keeps_the_labeled_shell_inside():

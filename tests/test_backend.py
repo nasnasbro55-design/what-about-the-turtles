@@ -37,7 +37,7 @@ def flight(tmp_path, n=4):
     for i in range(n):   # alternate the heading flip the real photos have
         dji_photo(d / f"DJI_2026110415{i:04d}_{i + 1:04d}_V.JPG", lat=38.79453 + i * 0.00002,
                   yaw=-155.9 if i % 2 else 24.1, roll=0 if i % 2 else 180, utc=f"2026-11-04T15:00:{10 - i:02d}.5")
-    dji_photo(d / "DJI_tilted_0099_V.JPG", pitch=-60)           # not straight down: skipped
+    dji_photo(d / "DJI_tilted_0099_V.JPG", pitch=-30)           # too close to the horizon: skipped
     dji_photo(d / "DJI_tele_0100_T.JPG")                        # other camera: skipped
     (d / "DJI_flight.MRK").write_text("timestamps")             # ignored
     return d
@@ -53,6 +53,15 @@ def test_ingest_reads_xmp_skips_bad_photos_and_sorts(tmp_path):
     f = fr[0]
     assert (f.width_px, f.height_px, f.alt_m, f.hfov_deg, f.sensor) == (1056, 792, 15.0, 70.65, Sensor.RGB)
     assert f.path.endswith("_V.JPG") and "/" not in f.path
+
+
+def test_db_upgrades_frames_table_made_before_tilt(tmp_path):
+    import sqlite3
+    c = sqlite3.connect(tmp_path / "old.db")
+    c.execute("CREATE TABLE frames (frame_id TEXT PRIMARY KEY, flight_id TEXT, site_id TEXT, sensor TEXT, path TEXT, timestamp TEXT,"
+              " lat REAL, lon REAL, alt_m REAL, yaw_deg REAL, width_px INTEGER, height_px INTEGER, hfov_deg REAL)"); c.commit(); c.close()
+    s = SqliteAlertStore(tmp_path / "old.db"); fr = ingest.ingest_flight(str(flight(tmp_path)), "grayson", "F1")
+    s.add_frames(fr); assert s.frame(fr[0].frame_id).pitch_deg == -90
 
 
 def test_flight_id_from_first_photo_date():

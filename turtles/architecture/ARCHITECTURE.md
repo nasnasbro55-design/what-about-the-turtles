@@ -100,7 +100,7 @@ Quick check that the mock data still matches the contracts: `python3 -m turtles.
 `turtles/contracts.py` is the source of truth. This is a summary. Times are UTC ISO 8601 strings, and coordinates are decimal degrees.
 
 **Frame**: one image plus where and when it was taken.
-`frame_id, flight_id, site_id, sensor (rgb|thermal), path, timestamp, lat, lon, alt_m, yaw_deg, width_px, height_px, hfov_deg`
+`frame_id, flight_id, site_id, sensor (rgb|thermal), path, timestamp, lat, lon, alt_m, yaw_deg, width_px, height_px, hfov_deg, pitch_deg` (pitch_deg defaults to -90, straight down; tilted photos down to -45 are supported)
 
 **Detection**: one thing a model thinks is a turtle, in one frame.
 `detection_id, frame_id, sensor, bbox [x_min, y_min, x_max, y_max] px, score 0-1, lat, lon, timestamp, model_version`
