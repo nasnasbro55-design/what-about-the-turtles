@@ -23,7 +23,7 @@ from turtles.geo import pixel_to_latlon
 ROOT = Path(__file__).resolve().parents[1]
 THUMB_PAD = 1.5      # crop = bbox grown by this many bbox-sizes on each side, so the responder sees surroundings
 THUMB_MIN_PX = 160   # never crop smaller than this (tiny far-away boxes)
-THUMB_OUT_PX = 320   # saved thumbnail longest side
+THUMB_OUT_PX = 480   # saved thumbnail size; small crops are smoothly scaled up so phones do not show blocky pixels
 
 
 def now_utc() -> str:
@@ -61,7 +61,8 @@ def make_thumbnail(image_path, bbox, out_path) -> bool:
             cx = min(max((x0 + x1) / 2, half), im.width - half)    # keep the crop inside the photo near the edges
             cy = min(max((y0 + y1) / 2, half), im.height - half)
             box = tuple(int(v) for v in (max(0, cx - half), max(0, cy - half), min(im.width, cx + half), min(im.height, cy + half)))
-            crop = im.crop(box).convert("RGB"); crop.thumbnail((THUMB_OUT_PX, THUMB_OUT_PX))
+            crop = im.crop(box).convert("RGB")
+            k = THUMB_OUT_PX / max(crop.size); crop = crop.resize((round(crop.width * k), round(crop.height * k)), Image.LANCZOS)
             Path(out_path).parent.mkdir(parents=True, exist_ok=True)
             crop.save(out_path, "JPEG", quality=85)
         return True
