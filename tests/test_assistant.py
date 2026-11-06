@@ -165,7 +165,7 @@ def test_claimed_log_without_tool_gets_done(tmp_path):
                     tool_call("update_alert", {"alert_id": "1", "status": "false_positive"}), answer_from_result])
     r = respond(s, "spot 1 was a false alarm", None, client=c)
     assert s.get("spot-1")["status"] == "false_positive" and r["alerts_changed"]
-    assert any("did not call update_alert" in str(m["content"]) for m in c.seen[1]["messages"])
+    assert any("[Check: you said you logged" in str(m["content"]) for m in c.seen[1]["messages"])
 
 
 def test_control_app_goes_to_the_screen(tmp_path):
@@ -276,3 +276,24 @@ def test_flight_plan_uses_the_live_planner_when_the_server_gives_one(tmp_path):
                           "thermal_ok": False, "reasons": ["Sunny afternoon"], "zone_id": "SITE"}]
     w = run_tool(s, "get_flight_plan", {})["windows"]
     assert w[0]["zone_name"] == "Grayson" and "zone_id" not in w[0]
+
+
+def test_claim_for_several_spots_must_save_each(tmp_path):
+    """Nov 5 bug: "Spots 1 and 2 are all marked as false alarms" with no update_alert slipped past the check."""
+    s = store(tmp_path)
+    c = FakeClaude([say("Spots 1 and 2 are all marked as false alarms."),
+                    tool_call("update_alert", {"alert_id": "1", "status": "false_positive"}),
+                    lambda kw: NS(stop_reason="tool_use", content=[NS(type="tool_use", id="t2", name="update_alert", input={"alert_id": "2", "status": "false_positive"})]),
+                    say("Spots 1 and 2 are marked as false alarms.")])
+    respond(s, "spot 1 and 2 are false alarms", None, client=c)
+    assert s.get("spot-1")["status"] == s.get("spot-2")["status"] == "false_positive"
+    assert any("still open" in str(m["content"]) for m in c.seen[1]["messages"])
+
+
+def test_partial_save_is_caught(tmp_path):
+    from turtles.backend.assistant import unsaved_claim
+    s = store(tmp_path); s.update("spot-1", status="false_positive")
+    acts = [{"tool": "update_alert", "input": {"alert_id": "1", "status": "false_positive"}}]
+    assert unsaved_claim(s, "Spots 1 and 2 are marked as false alarms.", acts) == [2]
+    assert unsaved_claim(s, "Spot 1 is marked as a false alarm.", acts) is None
+    assert unsaved_claim(s, "Spot 2 is next, about 40 feet north.", []) is None
