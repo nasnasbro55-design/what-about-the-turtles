@@ -212,6 +212,7 @@ def create_app(store: SqliteAlertStore, mock_zones: bool = False, mock_detect: b
         got = live_plan(site_id, data)
         return got if got is not None else []
 
+    store.plan_fn = (lambda: json.loads((MOCK / "windows.json").read_text())) if mock_zones else (lambda: live_plan("grayson", data))   # A.E.R.O.'s get_flight_plan
     app = assistant.create_app(store, mock_zones=mock_zones, first=first)
     app.include_router(r)
     return app

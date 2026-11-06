@@ -308,3 +308,15 @@ def test_alert_panel_shows_the_detection_close_up():
     assert 'id="detailPhoto"' in html and "onerror=" in html.split('id="detailPhoto"')[1].split(">")[0]
     fill = html.split("function fillDetail(alert)")[1].split("\n  }\n")[0]
     assert "alert.thumbnail" in fill and 'API_BASE + "/" + alert.thumbnail' in fill and "photoBox.style.display = 'none'" in fill
+
+
+def test_aero_knows_flights_and_detections_on_the_server(client):
+    """A.E.R.O. runs on the same SQLite store: after a flight it can say what the flight found and which spot is first."""
+    from turtles.backend.assistant import run_tool
+    client.post("/flights", files={"file": ("f.zip", zipped(flight(client.tmp)), "application/zip")}, data={"site_id": "grayson"})
+    f = run_tool(client.store, "list_flights", {})
+    assert f["total"] == 1 and f["flights"][0]["frames"] == 4 and f["flights"][0]["alerts"] == 1
+    top = run_tool(client.store, "list_alerts", {"status": "open"})["alerts"][0]
+    assert top["number"] == 3 and top["source"].startswith("drone") and top["source"].endswith("high")
+    assert run_tool(client.store, "get_alert", {"alert_id": "3"})["close_up_photo"]
+    assert "windows" in run_tool(client.store, "get_flight_plan", {}) and "note" not in run_tool(client.store, "get_flight_plan", {})
