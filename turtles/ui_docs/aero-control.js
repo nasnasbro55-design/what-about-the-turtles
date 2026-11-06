@@ -165,6 +165,7 @@
     if (activeAlert) {
       const a = activeAlert, rel = lastRelocation && lastRelocation.alert_id === a.alert_id ? lastRelocation : null;
       s.open_spot = `${spotName(a)} ${alertName(a).replace(/^Spot \d+:\s*/, '')} (${a.status}${a.species ? ', ' + a.species : ''}${a.sex ? ', ' + a.sex : ''})` +
+        (a.score == null ? '; test spot, no drone score' : `; drone ${Math.round(a.score * 100)}% ${a.confidence || 'review'}${a.thumbnail ? ', close-up photo shown in its details' : ''}`) +
         (a.note ? `; note: ${a.note}` : '') + (rel ? `; relocation guide: ${Math.round(rel.distance_m)} m ${compass(rel.bearing_deg)}` : '') +
         (me ? `; you are ${Math.round(distM(me, a))} m ${compass(bearingTo(me, a))} of it` : '');
       const log = typeof logSummary === 'function' ? logSummary(a.record, a) : ''; if (log) s.open_spot += `; field log: ${log}`;

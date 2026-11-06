@@ -3,7 +3,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 
 from turtles.contracts import FlightWindow, Zone, from_dict
-from turtles.planner.planner import flyable, hours_from, plan, thermal_ok
+from turtles.planner.planner import DAWN_DUSK, OFF_SEASON, OUT_OF_RANGE, activity, flyable, hours_from, plan, thermal_ok
 
 NOW = datetime(2026, 10, 25, 0, tzinfo=timezone.utc)  # Sat Oct 24, 8 PM Eastern
 
@@ -84,3 +84,29 @@ def test_sooner_work_ranks_first():
               forecast=fake_forecast(), now=NOW)
     assert ws[0].zone_id == "SOON"
     assert max(w.priority for w in ws if w.zone_id == "LATER") < ws[0].priority
+
+
+def test_activity_uses_tanyas_rules():
+    hrs = hours_from(fake_forecast())
+    i = lambda t: next(n for n, h in enumerate(hrs) if h["time"] == t)
+    assert activity(hrs, i("2026-10-25T16:00"))[0] == 1.0                      # 20 C = 68 F, midday, in season
+    assert "68" not in activity(hrs, i("2026-10-25T16:00"))[1] and "63-83" in activity(hrs, i("2026-10-25T16:00"))[1]
+    assert activity(hrs, i("2026-10-25T12:00"))[0] == DAWN_DUSK                # 30 min after sunrise
+    assert activity(hrs, i("2026-10-25T22:00"))[0] == DAWN_DUSK                # 20 min before sunset
+    cold = hours_from(fake_forecast(temperature_2m={"2026-10-25T16:00": 10.0}))  # 50 F
+    hot = hours_from(fake_forecast(temperature_2m={"2026-10-25T16:00": 31.0}))   # 88 F
+    assert activity(cold, i("2026-10-25T16:00"))[0] == OUT_OF_RANGE and "Below" in activity(cold, i("2026-10-25T16:00"))[1]
+    assert activity(hot, i("2026-10-25T16:00"))[0] == OUT_OF_RANGE and "Above" in activity(hot, i("2026-10-25T16:00"))[1]
+    wet = hours_from(fake_forecast(precipitation={"2026-10-25T14:00": 3.0}, temperature_2m={"2026-10-25T16:00": 16.0}))  # 61 F after real rain
+    assert activity(wet, i("2026-10-25T16:00")) == (1.0, "Real rain in the last 3 hours: Tanya says rain brings turtles out")
+    drizzle = hours_from(fake_forecast(precipitation={"2026-10-25T14:00": 0.5}, temperature_2m={"2026-10-25T16:00": 16.0}))
+    assert activity(drizzle, i("2026-10-25T16:00"))[0] == OUT_OF_RANGE         # drizzle does not count
+
+
+def test_off_season_lowers_priority_and_says_why():
+    fc = fake_forecast()
+    fc["hourly"]["time"] = [t.replace("2026-10-", "2026-11-") for t in fc["hourly"]["time"]]
+    fc["daily"] = {k: [t.replace("2026-10-", "2026-11-") for t in v] for k, v in fc["daily"].items()}
+    ws = plan("test", 38.76, -77.52, [zone(starts="2026-11-26T11:00:00Z")], forecast=fc, now=NOW.replace(month=11))
+    assert ws and all(w.priority <= OFF_SEASON for w in ws)
+    assert all(any("April-October" in r for r in w.reasons) for w in ws)

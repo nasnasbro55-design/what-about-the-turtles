@@ -2,11 +2,14 @@
 
 The phone (Huy's app + turtles/ui_docs/hey-turtle.js) turns speech into text and POSTs it to /assistant.
 Claude answers in short spoken sentences, and every factual answer comes from a tool that runs our real code:
-  list_alerts      -> the alert store (Ethan's SQLite later; JSON for now)
+  list_alerts      -> the alert store (SQLite via db.py when run from api.py; JSON pack standalone), with each spot's
+                      source (drone detection + score/confidence, or hand-placed test spot)
+  get_alert        -> one spot in full: detector score, how many photos saw it, close-up photo, notes, field log
+  list_flights     -> drone flights processed so far (photos, detections, alerts)
   get_relocation   -> F1 relocation guide (Tanya's rules on the F2 habitat map)
   update_alert     -> confirmed / relocated / false positive + species, sex, size, notes (feeds the F3 report)
   survey_progress  -> counts for "how many left"
-  get_flight_plan  -> planner windows
+  get_flight_plan  -> planner windows (live forecast when api.py runs it)
 So Claude never invents a drop-off spot. If there's no API key or no internet, an offline rule-based mode answers
 the core commands, so the demo can't die on stage.
 
@@ -41,7 +44,16 @@ How to answer:
 - Only set status "relocated" when the person says they moved or carried it; "confirmed" when they say they found a turtle;
   "false_positive" when they say nothing is there. Never infer a status. If they say "next" while the current alert is
   still open, first ask one short question: did they move it, or was it a false alarm?
-- "Next" means the next open alert: use list_alerts and tell them its name.
+- Spots come from two places. Drone spots: the detector found something in the flight photos; each has a score (how
+  sure the model is) and a confidence: high = seen in two or more photos or by two sensors, act now; review = a person
+  should look. Test spots were placed by hand and have no score. A drone spot's details show the drone close-up of what
+  the model saw: tell them to compare it with what is on the ground.
+- Say a score as "the drone model is 83 percent sure", never as a promise it is a turtle. Never say an area is clear or has
+  no turtles because nothing was flagged: the model misses some turtles, most often under brush or in shade. Say "the
+  drone didn't flag anything there" and that a walk of the fence line is still worth it.
+- "Next" means the next open spot by priority: high confidence first, then the highest score, then spot number. For
+  "closest" or "nearest", use the open spots by distance in [Screen now]. Tell them its number and name.
+- Questions about drone flights (what the last flight found, how many photos, when it flew) use list_flights.
 - Never say you logged, recorded, marked or saved anything unless you called update_alert in this same turn, and don't
   talk about logging at all unless you just logged something or they asked.
 - You can press the app's buttons with control_app (zoom, my location, open an alert, Site boundary and Fence band
@@ -62,7 +74,8 @@ How to answer:
 """
 
 TOOLS = [
-    {"name": "list_alerts", "description": "List drone alerts (possible turtles) with number, id, name, status and species.",
+    {"name": "list_alerts", "description": "List alerts (possible turtles) with number, id, name, status, species, source "
+     "(drone or test spot), detector score and confidence, in priority order (high first, then score).",
      "input_schema": {"type": "object", "properties": {"status": {"type": "string", "enum": STATUSES + ["all"],
                       "description": "Filter; default all"}}}},
     {"name": "get_relocation", "description": "Where to carry the turtle at an alert: distance, direction and reasons, "
@@ -98,9 +111,16 @@ TOOLS = [
                    "fence_toggle (the fence band is the heat map; the boundary is the site outline); tab: alerts or "
                    "flights; filter: all, open or resolved; theme: dark or light; list: up or down; chat: hide; "
                    "zoom_in / zoom_out: how many steps (default 1)"}}}},
+    {"name": "get_alert", "description": "Everything about one spot: source, detector score and confidence, how many "
+     "detections and sensors, which flight, whether a close-up photo exists, notes, field log, who changed it last.",
+     "input_schema": {"type": "object", "required": ["alert_id"], "properties": {"alert_id": {"type": "string"}}}},
+    {"name": "list_flights", "description": "Drone flights processed so far, newest first: flight id, when, photos read, "
+     "detections, alerts made, model version.",
+     "input_schema": {"type": "object", "properties": {}}},
     {"name": "survey_progress", "description": "Counts of open, confirmed, relocated and false-alarm alerts.",
      "input_schema": {"type": "object", "properties": {}}},
-    {"name": "get_flight_plan", "description": "Recommended upcoming drone flight windows from the planner.",
+    {"name": "get_flight_plan", "description": "Recommended upcoming drone flight windows from the planner (weather forecast, "
+     "Tanya's turtle activity rules, work dates).",
      "input_schema": {"type": "object", "properties": {}}},
 ]
 
@@ -203,9 +223,31 @@ def public(a: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in a.items() if not k.startswith("_")}
 
 
+def source(a: Dict[str, Any]) -> str:
+    """How A.E.R.O. describes where a spot came from: 'drone 83%, high' or 'test spot (no score)'."""
+    return f"drone {a['score']:.0%}, {a.get('confidence') or 'review'}" if a.get("score") is not None else "test spot (no score)"
+
+
+def priority(a: Dict[str, Any]):
+    """Which open spot to check first: high confidence, then the detector score, then spot number."""
+    return (a.get("confidence") != "high" or a.get("score") is None, -(a.get("score") or 0), a.get("number") or 0)
+
+
 def run_tool(store: AlertStore, name: str, args: Dict[str, Any]) -> Dict[str, Any]:
     if name == "list_alerts":
-        return {"alerts": [{k: a.get(k) for k in ("number", "alert_id", "name", "status", "species")} for a in store.list(args.get("status", "all"))]}
+        return {"alerts": [{**{k: a.get(k) for k in ("number", "alert_id", "name", "status", "species")}, "source": source(a)}
+                           for a in sorted(store.list(args.get("status", "all")), key=priority)]}
+    if name == "get_alert":
+        a = store.get(str(args.get("alert_id", "")))
+        if a is None: return {"error": "no such alert"}
+        return {**{k: a.get(k) for k in ("number", "alert_id", "name", "status", "species", "sex", "flight_id", "created_at",
+                                          "sensors", "updated_at", "updated_by")},
+                "source": source(a), "detections": len(a.get("detection_ids") or []), "close_up_photo": bool(a.get("thumbnail")),
+                "notes": [a["note"]] if a.get("note") else a.get("notes", []), "field_log": a.get("record") or {}}
+    if name == "list_flights":
+        fl = store.flights() if hasattr(store, "flights") else []
+        return {"flights": [{k: f.get(k) for k in ("flight_id", "created_at", "frames", "detections", "alerts", "model_version")} for f in fl[:5]],
+                "total": len(fl)} if fl else {"flights": [], "note": "no drone flights processed yet; only hand-placed test spots"}
     if name == "get_relocation":
         r = store.relocation(args["alert_id"], args.get("species", "box"))
         return r if r is not None else {"error": "no such alert"}
@@ -220,8 +262,11 @@ def run_tool(store: AlertStore, name: str, args: Dict[str, Any]) -> Dict[str, An
     if name == "survey_progress":
         al = store.list(); return {s: sum(a["status"] == s for a in al) for s in STATUSES} | {"total": len(al)}
     if name == "get_flight_plan":
+        if getattr(store, "plan_fn", None):   # api.py: the live planner on the real site (or the last saved plan offline)
+            w = store.plan_fn() or []
+            return {"windows": [{k: x.get(k) for k in ("zone_name", "start", "end", "priority", "thermal_ok", "reasons")} for x in w[:3]]}
         p = ROOT / "architecture" / "mock" / "windows.json"
-        return {"windows": json.loads(p.read_text())[:3] if p.exists() else [], "note": "sample windows until the live planner is wired in"}
+        return {"windows": json.loads(p.read_text())[:3] if p.exists() else [], "note": "sample windows (run the server from api.py for the live planner)"}
     return {"error": f"unknown tool {name}"}
 
 
@@ -299,9 +344,9 @@ def ask_claude(store: AlertStore, text: str, alert_id: Optional[str], history: L
         client = anthropic.Anthropic()
     cur = store.get(alert_id) if alert_id else None
     context = f"[The person is at alert #{cur['number']} ({cur['alert_id']}): {cur['name']}, status {cur['status']}.] " if cur else ""
-    open_now = [a for a in store.list() if a["status"] == "open"]
-    context = f"[Open now ({len(open_now)}): " + (", ".join(f"Spot {a.get('number')}" for a in open_now) or "none") + "] " + context
-    context = "[Alerts now: " + "; ".join(f"#{a.get('number')} {a.get('name') or a['alert_id']} ({a['alert_id']}): {a['status']}"
+    open_now = sorted((a for a in store.list() if a["status"] == "open"), key=priority)
+    context = f"[Open now, in priority order ({len(open_now)}): " + (", ".join(f"Spot {a.get('number')}" for a in open_now) or "none") + "] " + context
+    context = "[Alerts now: " + "; ".join(f"#{a.get('number')} {a.get('name') or a['alert_id']} ({a['alert_id']}): {a['status']}, {source(a)}"
                                          + (f", {a['species']}" if a.get("species") else "") for a in store.list()) + "] " + screen_text(screen) + context
     tools = [control_tool(catalog) if t["name"] == "control_app" else t for t in TOOLS]
     messages = [*clean_history(history), {"role": "user", "content": context + text}]
@@ -351,12 +396,20 @@ NUM = {w: i for i, w in enumerate("zero one two three four five six seven eight 
 def offline(store: AlertStore, text: str, alert_id: Optional[str]):
     """Rule-based fallback for the core commands (no key, no internet)."""
     t = text.lower(); a = store.get(alert_id) if alert_id else None; acts = []
-    if a is None: a = (store.list("open") or store.list())[0]
+    if a is None: a = (sorted(store.list("open"), key=priority) or store.list())[0]   # nothing open on screen: the top-priority spot
     species = "snapping" if "snap" in t else "box"
     if re.search(r"how many|progress|left", t):
         p = run_tool(store, "survey_progress", {}); return f"{p['open']} of {p['total']} alerts left. {p['relocated']} relocated so far.", acts
+    if re.search(r"how sure|confiden|\bscore\b|how certain", t):
+        return (f"Spot {a['number']}: the drone model is {a['score']:.0%} sure, {a.get('confidence') or 'review'} confidence."
+                + (" The close-up photo is in its details." if a.get("thumbnail") else "") if a.get("score") is not None
+                else f"Spot {a['number']} is a test spot, so there's no drone score."), acts
+    if re.search(r"\bflights?\b", t) and not re.search(r"when|plan|window|should", t):
+        f = run_tool(store, "list_flights", {})["flights"]
+        return (f"The last flight, {f[0]['flight_id']}, read {f[0]['frames']} photos and made {f[0]['alerts']} alerts." if f
+                else "No drone flights processed yet."), acts
     if re.search(r"\bnext\b", t):
-        nxt = next((x for x in store.list("open") if x["alert_id"] != a["alert_id"]), None)
+        nxt = next((x for x in sorted(store.list("open"), key=priority) if x["alert_id"] != a["alert_id"]), None)
         return (f"Next is number {nxt['number']}, {nxt['name']}." if nxt else "No open alerts left."), [{"tool": "focus", "input": {"alert_id": nxt["alert_id"]}}] if nxt else []
     fields = {}
     if "snap" in t: fields["species"] = "Common snapping turtle"

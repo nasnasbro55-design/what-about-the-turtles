@@ -213,7 +213,7 @@ def test_control_tool_is_built_from_the_apps_action_list(tmp_path):
     tool = next(t for t in c.seen[0]["tools"] if t["name"] == "control_app")
     assert tool["input_schema"]["properties"]["action"]["enum"] == ["layer", "set_field"] and "set_field" in tool["description"]
     assert r["ui"] == [{"action": "layer", "args": {"name": "fence_band", "state": "on"}}]
-    assert any("Open now (2): Spot 1, Spot 2" in str(m["content"]) for m in c.seen[0]["messages"])
+    assert any("Open now, in priority order (2): Spot 1, Spot 2" in str(m["content"]) for m in c.seen[0]["messages"])
 
 
 def test_voice_fills_the_field_log(tmp_path):
@@ -232,3 +232,47 @@ def test_screen_command_never_snaps_back_to_the_open_spot(tmp_path):
     assert respond(s, "show me spot 2", "spot-1", client=c)["alert_id"] == "spot-2"
     c = FakeClaude([tool_call("control_app", {"action": "layer", "args": {"name": "fence_band", "state": "on"}}), say("Done.")])
     assert respond(s, "fence band on", "spot-1", client=c)["alert_id"] is None
+
+
+def drone_store(tmp_path):
+    """Two hand-placed test spots plus two drone detections (one high, one review)."""
+    s = store(tmp_path)
+    s.alerts["F-1-A001"] = {"alert_id": "F-1-A001", "number": 3, "name": "Spot 3: detection 61%", "lat": 38.79, "lon": -77.64, "status": "open",
+                            "score": 0.61, "confidence": "review", "detection_ids": ["d1"], "thumbnail": "thumbnails/d1.jpg", "flight_id": "F-1", "notes": []}
+    s.alerts["F-1-A002"] = {"alert_id": "F-1-A002", "number": 4, "name": "Spot 4: detection 83%", "lat": 38.79, "lon": -77.64, "status": "open",
+                            "score": 0.83, "confidence": "high", "detection_ids": ["d2", "d3"], "thumbnail": "", "flight_id": "F-1", "notes": []}
+    return s
+
+
+def test_drone_spots_carry_score_and_come_first(tmp_path):
+    s = drone_store(tmp_path)
+    out = run_tool(s, "list_alerts", {"status": "open"})["alerts"]
+    assert [a["number"] for a in out] == [4, 3, 1, 2]                       # high first, then score, then the test spots
+    assert out[0]["source"] == "drone 83%, high" and out[-1]["source"] == "test spot (no score)"
+    g = run_tool(s, "get_alert", {"alert_id": "3"})
+    assert g["source"] == "drone 61%, review" and g["close_up_photo"] and g["detections"] == 1
+    assert run_tool(s, "list_flights", {})["flights"] == []                  # JSON store: no flights table
+
+
+def test_claude_sees_each_spots_source_and_priority(tmp_path):
+    s = drone_store(tmp_path)
+    c = FakeClaude([lambda kw: NS(stop_reason="end_turn", content=[NS(type="text", text="Spot 4.")])])
+    respond(s, "which one first", None, client=c)
+    ctx = c.seen[0]["messages"][-1]["content"]
+    assert "drone 83%, high" in ctx and "test spot (no score)" in ctx and "priority order (4): Spot 4, Spot 3, Spot 1, Spot 2" in ctx
+
+
+def test_offline_next_and_how_sure_use_the_detector(tmp_path):
+    s = drone_store(tmp_path)
+    def boom(kw): raise ConnectionError("no wifi")
+    assert "number 4" in respond(s, "next", "spot-1", client=FakeClaude([boom]))["reply"]
+    assert "83% sure" in respond(s, "how sure is it", "F-1-A002", client=FakeClaude([boom]))["reply"]
+    assert "test spot" in respond(s, "how sure is it", "spot-1", client=FakeClaude([boom]))["reply"]
+
+
+def test_flight_plan_uses_the_live_planner_when_the_server_gives_one(tmp_path):
+    s = store(tmp_path)
+    s.plan_fn = lambda: [{"zone_name": "Grayson", "start": "2026-11-06T20:00:00Z", "end": "2026-11-06T22:00:00Z", "priority": 0.9,
+                          "thermal_ok": False, "reasons": ["Sunny afternoon"], "zone_id": "SITE"}]
+    w = run_tool(s, "get_flight_plan", {})["windows"]
+    assert w[0]["zone_name"] == "Grayson" and "zone_id" not in w[0]

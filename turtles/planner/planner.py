@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from turtles.contracts import FlightWindow, Zone
+from turtles.rules import ACTIVE_F, ACTIVE_MONTHS, GOOD_RAIN_IN_PER_H
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"  # free, no key for non-commercial use
 HOURLY = "temperature_2m,soil_temperature_0cm,shortwave_radiation,cloud_cover,precipitation,wind_speed_10m"
@@ -29,8 +30,9 @@ URGENCY = ((24, 1.0), (72, 0.7), (168, 0.4))
 MIN_SUN_WM2 = 300      # shortwave radiation in the prior 3 h that counts as "sunny enough to bask"
 MAX_CLOUD_PCT = 50     # above this, assume turtles and ground are at the same temperature
 
-# Turtle activity rules: empty on purpose. They must come from Tanya (rules email Q8-12), not from us guessing.
-ACTIVITY: dict = {}
+# Turtle activity: the rules are Tanya's (turtles/rules.py, her Oct 27 email). The weights below are ours (v1):
+# how much to lower a window's priority when turtles are less likely to be out and visible.
+OFF_SEASON, OUT_OF_RANGE, DAWN_DUSK = 0.4, 0.7, 0.8
 
 TOP_PER_ZONE = 3
 
@@ -74,8 +76,21 @@ def thermal_ok(hours: list[dict], i: int) -> bool:
 
 
 def activity(hours: list[dict], i: int) -> tuple[float, str | None]:
-    """Tanya's turtle-activity rules -> (multiplier, reason). 1.0 until she answers."""
-    return 1.0, None
+    """Tanya's turtle-activity rules for hour i -> (priority multiplier, reason). Open-Meteo gives C and mm."""
+    h, (lo, hi) = hours[i], ACTIVE_F
+    t = utc(h["time"])
+    if t.astimezone(LOCAL).month not in ACTIVE_MONTHS:
+        return OFF_SEASON, "Outside Tanya's April-October active season: turtles are likely dormant and buried, so a drone may not see them"
+    if h["temperature_2m"] is None:
+        return 1.0, None
+    f, rain_in = h["temperature_2m"] * 9 / 5 + 32, max([x["precipitation"] or 0 for x in hours[max(0, i - 3):i]], default=0) / 25.4
+    if rain_in >= GOOD_RAIN_IN_PER_H and f >= lo - 5:
+        return 1.0, "Real rain in the last 3 hours: Tanya says rain brings turtles out"
+    if f < lo or f > hi:
+        return OUT_OF_RANGE, f"Below Tanya's {lo}-{hi}°F active range at times: turtles less active" if f < lo else f"Above Tanya's {lo}-{hi}°F active range at times: turtles likely sheltering"
+    if t - utc(h["sunrise"]) < timedelta(hours=1) or utc(h["sunset"]) - t <= timedelta(hours=1):
+        return DAWN_DUSK, "Near dawn or dusk at times: Tanya says turtles are not active then"
+    return 1.0, f"Inside Tanya's {lo}-{hi}°F active range: turtles likely moving"
 
 
 def _when(t: datetime) -> str:
