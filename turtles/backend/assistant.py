@@ -54,6 +54,7 @@ How to answer:
 - "Next" means the next open spot by priority: high confidence first, then the highest score, then spot number. For
   "closest" or "nearest", use the open spots by distance in [Screen now]. Tell them its number and name.
 - Questions about drone flights (what the last flight found, how many photos, when it flew) use list_flights.
+- When they name several spots ("11, 12 and 13 are false alarms"), call update_alert once for EACH spot.
 - Never say you logged, recorded, marked or saved anything unless you called update_alert in this same turn, and don't
   talk about logging at all unless you just logged something or they asked.
 - You can press the app's buttons with control_app (zoom, my location, open an alert, Site boundary and Fence band
@@ -364,14 +365,16 @@ def ask_claude(store: AlertStore, text: str, alert_id: Optional[str], history: L
             messages.append({"role": "user", "content": results})
             continue
         text = " ".join(b.text for b in r.content if b.type == "text").strip()
-        if text and not uses and not checked and re.search(r"^(?:logged|recorded|marked|saved)\b|\bI(?:'ve| have| just)?\s+(?:logged|recorded|marked|saved)\b", text, re.I) \
-                and not any(x["tool"] == "update_alert" for x in actions):
-            # it claimed a log without calling the tool: make it actually do it (or take it back) before the person hears it
-            checked = True; print("  claude claimed a log without update_alert -> asking it to do it")
+        unsaved = unsaved_claim(store, text, actions) if text and not uses and not checked else None
+        if unsaved is not None:
+            # it claimed a change it didn't make (or made for only some spots): make it actually do it (or take it back)
+            checked = True; print(f"  claude claimed a log without update_alert {unsaved or ''} -> asking it to do it")
             messages += [{"role": "assistant", "content": r.content},
-                         {"role": "user", "content": "[Check: you said you logged or recorded something, but you did not call "
-                          "update_alert in this turn. If the person asked you to record something, call update_alert now and then "
-                          "confirm. If not, answer again without claiming you logged anything.]"}]
+                         {"role": "user", "content": "[Check: you said you logged, recorded or marked something, but "
+                          + (f"Spot {', '.join(map(str, unsaved))} {'is' if len(unsaved) == 1 else 'are'} still open: update_alert was not called for "
+                             f"{'it' if len(unsaved) == 1 else 'them'}. " if unsaved else "you did not call update_alert in this turn. ")
+                          + "If the person asked you to record it, call update_alert now (one call per spot) and then confirm. "
+                          "If not, answer again without claiming you logged anything.]"}]
             continue
         if text and not uses: return text, actions
         # cut off (or no words): never send a half-finished tool call back; ask again with room to answer
@@ -388,6 +391,22 @@ def ask_claude(store: AlertStore, text: str, alert_id: Optional[str], history: L
         if text: return text, actions
         raise RuntimeError(f"no spoken reply (stop={r2.stop_reason})")
     return "Sorry, that took too many steps. Try asking one thing at a time.", actions
+
+
+CLAIM = re.compile(r"^(?:logged|recorded|marked|saved)\b|\bI(?:'ve| have| just)?\s+(?:logged|recorded|marked|saved|updated)\b"
+                   r"|\b(?:logged|recorded|marked|saved|set|updated|changed)\b.{0,60}?\b(?:false alarms?|false positives?|relocated|confirmed)\b",
+                   re.I | re.S)
+
+
+def unsaved_claim(store: AlertStore, text: str, actions: List[Dict[str, Any]]) -> Optional[List[int]]:
+    """None if the reply makes no unbacked claim. Otherwise the spot numbers it says it changed that are still open
+    ([] = it claimed a log and called update_alert for nothing at all this turn)."""
+    # "was already marked" describes the past, not a change made now
+    if not any("already" not in text[max(0, m.start() - 14):m.start()].lower() for m in CLAIM.finditer(text)): return None
+    numbers = {a.get("number"): a for a in store.list()}
+    stale = sorted(n for n in {int(x) for x in re.findall(r"\b(\d{1,3})\b", text)} if n in numbers and numbers[n]["status"] == "open")
+    if stale: return stale
+    return [] if not any(x["tool"] == "update_alert" for x in actions) else None
 
 
 NUM = {w: i for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve".split())}
