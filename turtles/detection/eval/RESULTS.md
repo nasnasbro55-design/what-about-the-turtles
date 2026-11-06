@@ -1,9 +1,33 @@
 # A.E.R.O. detector - results (Nov 4-5, 2026)
 
-Final model: `rs_seg_v2` - YOLO11s segmentation, 640 px tiles at native drone resolution, every photo shadow-lifted
+Final model: **`rl_seg_v3`** (Nov 5 evening; was `rs_seg_v2`) - YOLO11s segmentation, 640 px tiles at native drone resolution, every photo shadow-lifted
 (CLAHE) before detection. Weights stay in OneDrive (trained on W.A. Hazel imagery). Scoring rules were fixed before
 any test ran (`evaluate.py`): a detection counts only if its center lies within max(20 px, half the shell's box
 diagonal) of the hand-labeled center; each shell matched once; 95% ranges are Wilson intervals.
+
+## Update, Nov 5 evening: model v3 (`rl_seg_v3`)
+
+Test D showed v2 missed side views (head and legs out) and Tanya's black-and-yellow turtles. v3 = v2 retrained 2.5 h
+on dataset RL: RS plus 815 tiles of real LIVING turtle photos placed on survey legs 1-2 (`build_living.py`). Six
+turtles (27 Test D photos) were held out of v3 and the decision rule was fixed BEFORE training: v3 replaces v2 only
+if it beats v2 on Test B and on the held-out turtles.
+
+| Check | v2 (`rs_seg_v2`) | v3 (`rl_seg_v3`) |
+|---|---|---|
+| **Test B** (unchanged: real shells in place, skins never trained on) @0.25 | 13/23 = 57% (37-74%) | **17/23 = 74% (54-87%)** |
+| Test B: rut / half buried / riprap | 7/8 / 5/11 / 1/4 | **8/8 / 8/11** / 1/4 |
+| Test B @0.5 (app setting) / @0.7 | 52% / 30% | **65% / 43%** |
+| Held-out Test D turtles @0.25 | 11/27 = 41% | 27/27 = 100% (see caveat) |
+| False alarms, 139 turtle-free leg-3 photos, @0.25 / @0.5 / @0.7 | 1.86 / 0.68 / 0.17 | 3.88 / 1.39 / 0.29 |
+
+Read honestly:
+- **Test B is the number to trust**: 74%, above the 70% target by the agreed definition, but the 95% range runs
+  down to 54%, and v3 is the 5th model measured on the same 23 shells (a small optimistic bias).
+- The held-out 100% is NOT a headline: those turtles were pasted the same way as v3's training turtles (v3 may partly
+  recognize the paste), and GMU photos may show the same few physical turtles as the training ones. Full Test D is no
+  longer independent for v3.
+- False alarms about doubled. At the app's 0.5 floor that is ~1.4 per photo ("needs review" tier); HIGH still needs
+  two photos >= 0.7.
 
 ## The finding that shaped everything
 
@@ -13,9 +37,9 @@ trained on it learned "small white blob" and fired on rocks. So the final model 
 real drone shells, traced along their exact outline and repainted in place with real carapace patterns (Tanya's
 rescues, the GMU shell), plus outline polygons (shape), plus placed turtles on survey legs 1-2, plus mined false alarms.
 
-## Results
+## Results (v2 and earlier; v3 above)
 
-| Test | What it measures | rs_seg_v2 (final) | rs_seg_v1 (this morning) |
+| Test | What it measures | rs_seg_v2 (Nov 4 final) | rs_seg_v1 (this morning) |
 |---|---|---|---|
 | **B - headline** | Real shells at the 3 held-out spots (rut, half buried, riprap), repainted in place with 3 skins **never used in training** | **13/23 = 57%** (95% CI 37-74%) at score >= 0.25; 52% at >= 0.5; confident (>= 0.7) detections are right 78% of the time | 6/23 = 26% |
 | B by spot | rut / half buried / riprap | **7/8 (88%)** / 5/11 (45%) / 1/4 | 1/8 / 4/11 / 1/4 |
@@ -40,8 +64,8 @@ HIGH-priority alert at the shell; 2 false alarms (one photo) as lower-tier "need
 
 ## Honest limits
 
-- **Target (70% on held-out shells) not met.** Test B 57%, Test D 41%; riprap (white rocks), side views and
-  black-and-yellow turtles are the hardest cases. Fix: real living-turtle drone photos for training.
+- **Target (70%):** v3 reaches 74% on Test B (54-87%); v2 was 57%, and v2 scored 41% on Test D. Hardest cases: riprap (white rocks, still 1/4), side views,
+  black-and-yellow turtles. More false alarms with v3. Fix: real living-turtle drone photos for training.
 - **No live turtle has been photographed from the drone yet.** B, C and D are simulations built on real ground.
   First live flight: Fri Nov 6, Grayson site, Tanya's turtle, Logan flying, 30 and 50 ft. Test only, never trained on.
 - Test D cannot show turtles partly hidden in grass or under cover (a pasted image cannot do that honestly).
@@ -56,3 +80,5 @@ HIGH-priority alert at the shell; 2 false alarms (one photo) as lower-tier "need
 `index_photos` -> label (`label_shells.html`) -> `build_real` -> `reskin` (dataset RS + Test B) -> `test_c --train`
 (placements) -> `mine` -> `train ... RS --model yolo11s-seg.pt` -> `evaluate` (A, B with `<work>/test_b`, C with
 `--labels <work>/test_c/labels.json`, D with `<work>/test_d --labels <work>/test_d/labels.json`). Commands in each module's docstring.
+v3: `build_living` -> `train <work> RL --hours 2.5 --model <work>/runs/rs_seg_v2/weights/last.pt --name rl_seg_v3`;
+Test B with `--no-survey`; false alarms from a run on the original data folder.
