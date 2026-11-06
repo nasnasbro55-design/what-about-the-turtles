@@ -1205,9 +1205,10 @@
   function resetMapView() {
     // [A.E.R.O. control] recentering means "show me the site": stop following the GPS, or the next fix pulls the map back to you
     if (typeof followMe !== 'undefined' && followMe) { followMe = false; document.getElementById('btnLocate').classList.remove('active'); }
-    // [A.E.R.O. integration] fit to wherever the alerts are (mock lot or the real Grayson spots)
-    if (alerts.length) map.fitBounds(L.latLngBounds(alerts.map(a => [a.lat, a.lon])).pad(0.35), { maxZoom: 19 });
-    else map.setView([38.7601, -77.5198], 18);
+    // [A.E.R.O. integration] fit the site boundary plus every alert; with neither, the Grayson flight start point (never the old mock lot)
+    const pts = [...alerts.map(a => [a.lat, a.lon]), ...zones.flatMap(z => z.polygon || [])];
+    if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(alerts.length ? 0.35 : 0.1), { maxZoom: 19 });
+    else map.setView([38.7942, -77.6481], 17);
   }
 
   // [A.E.R.O. UI] same meaning as before (red inside the fence: check here; green outside: cover), theme colors, softer
@@ -1277,7 +1278,7 @@
     renderAlertMarkers();
     renderAlertsList();
     renderFlightWindows();
-    if (!fittedToAlerts && alerts.length) { fittedToAlerts = true; resetMapView(); }  // [A.E.R.O. integration] real site, not the mock lot
+    if (!fittedToAlerts && (alerts.length || zones.length)) { fittedToAlerts = true; resetMapView(); }  // [A.E.R.O. integration] real site, not the mock lot (also with no alerts yet)
   }
   let fittedToAlerts = false;
 
