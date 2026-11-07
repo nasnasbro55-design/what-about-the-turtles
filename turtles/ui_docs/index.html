@@ -232,6 +232,24 @@
       font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; transition: opacity .25s ease, transform .25s ease; }
     #toast.on { opacity: 1; transform: translate(-50%, 0); }
 
+    /* [A.E.R.O. UI] flight video: recorded drone video with the detector's boxes drawn over it */
+    #videoView { position: fixed; inset: 0; z-index: 10050; display: none; flex-direction: column; background: var(--bg); color: var(--ink); }
+    #videoView.open { display: flex; }
+    .vv-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+    .vv-head h2 { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: 18px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vv-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel); color: var(--ink); font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+    .vv-btn[aria-pressed="true"] { color: var(--accent-text); background: var(--accent-soft); border-color: var(--accent); }
+    .vv-stage { position: relative; flex: 1; min-height: 0; background: #000; }
+    .vv-stage video, .vv-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+    .vv-stage canvas { pointer-events: none; }
+    .vv-foot { padding: 10px 16px 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+    .vv-line { position: relative; height: 22px; border-radius: 4px; background: var(--panel-2); cursor: pointer; overflow: hidden; }
+    .vv-line i { position: absolute; top: 3px; bottom: 3px; width: 3px; border-radius: 1px; }
+    .vv-line b { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); }
+    .vv-cap { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+    .vv-cap strong { color: var(--ink); font-weight: 500; }
+    .vv-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+    .vv-row select { min-height: 36px; background: var(--panel); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 6px; padding: 0 8px; font: inherit; }
     @media (max-width: 1100px) { .brand-sub { display: none; } .map-legend { display: none; } }
     @media (max-width: 768px) {
       header { height: calc(56px + env(safe-area-inset-top)); padding-left: 12px; padding-right: 12px; }
@@ -255,7 +273,7 @@
       .detail-name { font-size: 24px; } .relocation-instruction { font-size: 19px; }
       .detail-photo img { max-height: 30vh; }   /* leave room for the relocation advice in the sheet */
       .leaflet-control-zoom { display: none; }
-      html body #ht-dock { right: 14px; bottom: calc(48% + 14px); transition: bottom .25s ease; flex-direction: column-reverse; align-items: center; }
+      html body #ht-dock { right: auto; left: 14px; bottom: calc(48% + 14px); transition: bottom .25s ease; flex-direction: column-reverse; align-items: center; }   /* left edge: the map buttons run down the right edge */
       html body.sheet-down #ht-dock { bottom: calc(92px + env(safe-area-inset-bottom)); }
       html body.detail-open #ht-dock { bottom: auto; top: calc(70px + env(safe-area-inset-top)); right: auto; left: 12px; flex-direction: column; }
     }
@@ -373,6 +391,7 @@
     <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
     <symbol id="i-nav" viewBox="0 0 24 24"><path d="M12 2l7 19-7-4-7 4z"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3z"/></symbol>
     <symbol id="i-me" viewBox="0 0 24 24"><path d="M3.5 10.5L20.5 3.5l-7 17-2.2-7.8z"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
     <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5"/></symbol>
@@ -417,6 +436,9 @@
       </button>
       <button class="btn-map-tool" id="btnLocate" onclick="locateMe()" title="My location">
         <svg class="icon"><use href="#i-me"/></svg><span class="t">My location</span>
+      </button>
+      <button class="btn-map-tool" id="btnVideo" onclick="openVideo()" title="Flight video" style="display:none">
+        <svg class="icon"><use href="#i-video"/></svg><span class="t">Flight video</span>
       </button>
     </div>
 
@@ -1567,5 +1589,80 @@
 </script>
 
 
+  <!-- [A.E.R.O. UI] flight video: recorded drone video + the detector's boxes (analyzed after landing, not live) -->
+  <div id="videoView" role="dialog" aria-modal="true" aria-labelledby="vvTitle">
+    <div class="vv-head">
+      <button class="vv-btn" onclick="closeVideo()"><svg class="icon"><use href="#i-back"/></svg>Map</button>
+      <h2 id="vvTitle">Flight video</h2>
+      <button class="vv-btn" id="vvWeak" aria-pressed="false" onclick="vvToggleWeak()" title="Also show weak boxes (25 to 50%)">Weak boxes</button>
+    </div>
+    <div class="vv-stage"><video id="vvVideo" playsinline controls preload="metadata"></video><canvas id="vvCanvas"></canvas></div>
+    <div class="vv-foot">
+      <div class="vv-row"><span id="vvNow">No detection in this second</span><span style="flex:1"></span><select id="vvPick" onchange="vvLoad(this.value)" aria-label="Video"></select></div>
+      <div class="vv-line" id="vvLine" title="Seconds where the detector drew a box: tap to jump there"><b id="vvHead"></b></div>
+      <p class="vv-cap" id="vvCap"></p>
+    </div>
+  </div>
+  <script>
+  // [A.E.R.O. UI] flight video. Track = GET /videos/<name>.json: {src_size, sample_fps, ms_per_frame, model, frames: [{t, boxes: [[x0,y0,x1,y1,score]]}]}
+  let vvList = [], vvTrack = null, vvWeakOn = false, vvRaf = 0;
+  const vvFloor = () => vvWeakOn ? 0.25 : 0.5;
+  const vvColor = s => getComputedStyle(document.documentElement).getPropertyValue(s >= 0.7 ? '--high' : s >= 0.5 ? '--review' : '--muted').trim() || '#f00';
+  async function vvInit() {
+    try { const r = await fetch(API_BASE + '/videos'); if (!r.ok) return; vvList = (await r.json()).filter(v => v.track); } catch (e) { return; }
+    if (!vvList.length) return;
+    document.getElementById('btnVideo').style.display = '';
+    document.getElementById('vvPick').innerHTML = vvList.map(v => `<option value="${v.name}">${v.title || v.name}</option>`).join('');
+    document.getElementById('vvPick').style.display = vvList.length > 1 ? '' : 'none';
+  }
+  function openVideo() { document.getElementById('videoView').classList.add('open'); if (!vvTrack && vvList.length) vvLoad(vvList[0].name); }
+  function closeVideo() { const v = document.getElementById('vvVideo'); v.pause(); document.getElementById('videoView').classList.remove('open'); }
+  function vvToggleWeak() { vvWeakOn = !vvWeakOn; document.getElementById('vvWeak').setAttribute('aria-pressed', vvWeakOn); vvTimeline(); vvDraw(); }
+  async function vvLoad(name) {
+    const meta = vvList.find(v => v.name === name); if (!meta) return;
+    vvTrack = await (await fetch(API_BASE + '/' + meta.track)).json();
+    const v = document.getElementById('vvVideo'); v.src = API_BASE + '/' + meta.video;
+    document.getElementById('vvTitle').innerText = vvTrack.title || name;
+    const sec = (vvTrack.ms_per_frame / 1000).toFixed(1);
+    document.getElementById('vvCap').innerHTML = (vvTrack.caption ? `<strong>${esc(vvTrack.caption)}</strong> ` : '')
+      + `Recorded drone video, analyzed after landing: model ${esc(vvTrack.model)} checked one frame every ${(1 / vvTrack.sample_fps).toFixed(0)} s `
+      + `(${sec} s per frame on this laptop, so not real-time yet). Boxes: red 70%+, amber 50 to 70%. The model marks what looks like a turtle; a person confirms.`;
+    v.onloadedmetadata = () => { vvTimeline(); vvDraw(); };
+    v.onplay = () => { cancelAnimationFrame(vvRaf); const loop = () => { vvDraw(); if (!v.paused) vvRaf = requestAnimationFrame(loop); }; loop(); };
+    v.onseeked = v.onpause = vvDraw;
+  }
+  function vvFrame(t) {   // the analyzed frame for this moment (each one stands for 1/fps seconds)
+    if (!vvTrack) return null; const half = 0.5 / vvTrack.sample_fps;
+    return vvTrack.frames.find(f => Math.abs(f.t - t) <= half) || null;
+  }
+  function vvTimeline() {
+    const v = document.getElementById('vvVideo'), line = document.getElementById('vvLine'), dur = v.duration || (vvTrack.frames.at(-1).t + 1);
+    line.querySelectorAll('i').forEach(n => n.remove());
+    vvTrack.frames.forEach(f => { const s = Math.max(0, ...f.boxes.map(b => b[4])); if (s < vvFloor()) return;
+      const i = document.createElement('i'); i.style.left = (100 * f.t / dur) + '%'; i.style.background = vvColor(s); i.title = `${f.t.toFixed(0)} s: ${Math.round(s * 100)}%`; line.appendChild(i); });
+    line.onclick = e => { const r = line.getBoundingClientRect(); v.currentTime = dur * (e.clientX - r.left) / r.width; };
+  }
+  function vvDraw() {
+    const v = document.getElementById('vvVideo'), c = document.getElementById('vvCanvas'), dpr = window.devicePixelRatio || 1;
+    const W = c.clientWidth, H = c.clientHeight; c.width = W * dpr; c.height = H * dpr;
+    const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    if (!vvTrack || !v.videoWidth) return;
+    const k = Math.min(W / v.videoWidth, H / v.videoHeight), ox = (W - v.videoWidth * k) / 2, oy = (H - v.videoHeight * k) / 2;
+    const sx = v.videoWidth * k / vvTrack.src_size[0], sy = v.videoHeight * k / vvTrack.src_size[1];
+    const f = vvFrame(v.currentTime), shown = f ? f.boxes.filter(b => b[4] >= vvFloor()) : [];
+    shown.forEach(([x0, y0, x1, y1, s]) => {
+      const pad = 10, x = ox + x0 * sx - pad, y = oy + y0 * sy - pad, w = (x1 - x0) * sx + 2 * pad, h = (y1 - y0) * sy + 2 * pad, col = vvColor(s);
+      g.lineWidth = 2.5; g.strokeStyle = col; g.strokeRect(x, y, w, h);
+      g.font = '600 12px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); const txt = Math.round(s * 100) + '%';
+      g.fillStyle = col; g.fillRect(x, y - 18, g.measureText(txt).width + 10, 18); g.fillStyle = '#000'; g.fillText(txt, x + 5, y - 5);
+    });
+    const best = Math.max(0, ...shown.map(b => b[4]));
+    document.getElementById('vvNow').innerText = shown.length ? `${Math.floor(v.currentTime)} s · ${shown.length} box${shown.length > 1 ? 'es' : ''} · best ${Math.round(best * 100)}%` : `${Math.floor(v.currentTime)} s · no detection in this second`;
+    document.getElementById('vvHead').style.left = (100 * v.currentTime / (v.duration || 1)) + '%';
+  }
+  window.addEventListener('resize', () => { if (document.getElementById('videoView').classList.contains('open')) vvDraw(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('videoView').classList.contains('open')) closeVideo(); });
+  vvInit();
+  </script>
 </body>
 </html>

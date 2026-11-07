@@ -82,9 +82,11 @@ def flight_photos(folder) -> list[Path]:
     return sorted(p for p in Path(folder).rglob("*") if p.is_file() and p.name.upper().endswith("_V.JPG"))
 
 
-def ingest_flight(folder: str, site_id: str, flight_id: str, nadir_only: bool = False) -> list[Frame]:
-    """Return one Frame per usable *_V.JPG in folder (searched recursively), sorted by timestamp."""
-    return sorted((f for p in flight_photos(folder) if (f := frame_from_photo(p, folder, site_id, flight_id, nadir_only))),
+def ingest_flight(folder: str, site_id: str, flight_id: str, nadir_only: bool = False, only=None) -> list[Frame]:
+    """Return one Frame per usable *_V.JPG in folder (searched recursively), sorted by timestamp.
+    only: file names to keep (e.g. one turtle's photos from a folder that has two); None = every photo."""
+    keep = {Path(n).name for n in only} if only else None
+    return sorted((f for p in flight_photos(folder) if (keep is None or p.name in keep) and (f := frame_from_photo(p, folder, site_id, flight_id, nadir_only))),
                   key=lambda f: (f.timestamp, f.path))
 
 

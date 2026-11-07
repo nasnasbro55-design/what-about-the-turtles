@@ -43,7 +43,7 @@ MOCK = ROOT / "architecture" / "mock"
 _plan_cache: dict = {}
 
 try:   # module level: with `from __future__ import annotations` FastAPI resolves these names from module globals
-    from fastapi import File, Form, HTTPException, UploadFile
+    from fastapi import File, Form, HTTPException, Request, UploadFile
     from pydantic import BaseModel
 
     class LocalFlight(BaseModel):   # module level, same reason as assistant.Patch
@@ -52,6 +52,7 @@ try:   # module level: with `from __future__ import annotations` FastAPI resolve
         flight_id: Optional[str] = None
         mock_detect: bool = False
         no_geofence: bool = False
+        photos: Optional[list[str]] = None   # file names to use (e.g. one turtle's photos); None = the whole folder
 except ImportError:
     LocalFlight = None
 
@@ -138,10 +139,10 @@ def create_app(store: SqliteAlertStore, mock_zones: bool = False, mock_detect: b
     first, r = APIRouter(), APIRouter()   # first: overrides of assistant.app_router (GET /alerts, /plan); r: new routes,
                                           # mounted after, so /alerts/changes still wins over /alerts/{alert_id}
 
-    def run(folder, site_id, flight_id=None, mock=False, no_geofence=False):
+    def run(folder, site_id, flight_id=None, mock=False, no_geofence=False, photos=None):
         try:
             return pipeline.run_flight(folder, site_id, store, flight_id, pipeline.mock_detector() if (mock or mock_detect) else None,
-                                       geofence=None if no_geofence else "auto")
+                                       geofence=None if no_geofence else "auto", photos=photos)
         except ValueError as e: raise HTTPException(400, str(e))
         except RuntimeError as e: raise HTTPException(503, str(e))
 
@@ -162,10 +163,37 @@ def create_app(store: SqliteAlertStore, mock_zones: bool = False, mock_detect: b
     @r.post("/flights/local")
     def local_flight(p: LocalFlight):
         if not Path(p.folder).is_dir(): raise HTTPException(400, f"not a folder on this laptop: {p.folder}")
-        return run(p.folder, p.site_id, p.flight_id, p.mock_detect, p.no_geofence)
+        return run(p.folder, p.site_id, p.flight_id, p.mock_detect, p.no_geofence, p.photos)
 
     @r.get("/flights")
     def flights(site_id: Optional[str] = None): return store.flights(site_id)
+
+    @r.get("/videos")
+    def videos():
+        """Recorded drone videos beside the database (<db folder>/videos/<name>.mp4) with the detector's track
+        (<name>.json, made by turtles.backend.video_track after landing), for the app's flight-video screen."""
+        out = []
+        for mp4 in sorted((data / "videos").glob("*.mp4")):
+            tr = mp4.with_suffix(".json"); t = json.loads(tr.read_text()) if tr.exists() else {}
+            out.append({"name": mp4.stem, "video": f"videos/{mp4.name}", "track": f"videos/{tr.name}" if tr.exists() else "",
+                        **{k: t.get(k) for k in ("title", "caption", "model", "recorded", "sample_fps", "ms_per_frame")}})
+        return out
+
+    @r.get("/videos/{name}")
+    def video_file(name: str, request: Request):
+        from fastapi.responses import FileResponse, Response
+        f = data / "videos" / Path(name).name
+        if f.suffix not in (".mp4", ".json") or not f.is_file(): raise HTTPException(404)
+        if f.suffix == ".json": return FileResponse(f, media_type="application/json", headers={"Cache-Control": "no-store"})
+        size, rng = f.stat().st_size, request.headers.get("range", "")
+        if not rng.startswith("bytes="):   # whole file; Safari and phones then ask for ranges
+            return FileResponse(f, media_type="video/mp4", headers={"Accept-Ranges": "bytes"})
+        a, _, b = rng[6:].split(",")[0].partition("-")
+        start = int(a) if a else max(0, size - int(b)); end = min(int(b) if a and b else size - 1, size - 1, start + (8 << 20) - 1)
+        if start >= size: return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+        with open(f, "rb") as fh: fh.seek(start); chunk = fh.read(end - start + 1)
+        return Response(chunk, status_code=206, media_type="video/mp4",
+                        headers={"Content-Range": f"bytes {start}-{end}/{size}", "Accept-Ranges": "bytes", "Content-Length": str(len(chunk))})
 
     @first.get("/alerts")
     def alerts(site_id: Optional[str] = None, status: Optional[str] = None):
