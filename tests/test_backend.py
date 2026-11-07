@@ -320,3 +320,44 @@ def test_aero_knows_flights_and_detections_on_the_server(client):
     assert top["number"] == 3 and top["source"].startswith("drone") and top["source"].endswith("high")
     assert run_tool(client.store, "get_alert", {"alert_id": "3"})["close_up_photo"]
     assert "windows" in run_tool(client.store, "get_flight_plan", {}) and "note" not in run_tool(client.store, "get_flight_plan", {})
+
+
+# --- one turtle's photos from a shared folder; flight videos --------------------------------------------
+
+def test_local_flight_can_use_only_listed_photos(client):
+    folder = flight(client.tmp); names = sorted(p.name for p in folder.glob("*_V.JPG"))[:2]
+    r = client.post("/flights/local", json={"folder": str(folder), "photos": names}).json()
+    assert r["frames"] == 2
+    assert client.post("/flights/local", json={"folder": str(folder), "photos": ["nope_V.JPG"]}).status_code == 400
+
+
+def test_videos_are_listed_and_stream_in_ranges(client):
+    vids = client.tmp / "videos"; vids.mkdir()
+    (vids / "turtle_B.mp4").write_bytes(bytes(range(256)) * 100)                     # 25,600 bytes stand-in
+    (vids / "turtle_B.json").write_text(json.dumps({"title": "Turtle B", "model": "rgb-la_v1", "sample_fps": 1, "ms_per_frame": 1600,
+                                                     "src_size": [3840, 2160], "frames": [{"t": 45, "boxes": [[1, 2, 30, 40, 0.8]]}]}))
+    (vids / "no_track.mp4").write_bytes(b"x" * 10)
+    v = {x["name"]: x for x in client.get("/videos").json()}
+    assert v["turtle_B"]["track"] == "videos/turtle_B.json" and v["turtle_B"]["model"] == "rgb-la_v1" and v["no_track"]["track"] == ""
+    assert client.get("/videos/turtle_B.json").json()["frames"][0]["t"] == 45
+    full = client.get("/videos/turtle_B.mp4"); assert full.status_code == 200 and len(full.content) == 25600
+    part = client.get("/videos/turtle_B.mp4", headers={"Range": "bytes=100-199"})
+    assert part.status_code == 206 and part.content == (bytes(range(256)) * 100)[100:200] and part.headers["content-range"] == "bytes 100-199/25600"
+    tail = client.get("/videos/turtle_B.mp4", headers={"Range": "bytes=-10"}); assert tail.status_code == 206 and len(tail.content) == 10
+    assert client.get("/videos/turtle_B.mp4", headers={"Range": "bytes=999999-"}).status_code == 416
+    assert client.get("/videos/../t.db").status_code == 404 and client.get("/videos/x.txt").status_code == 404
+
+
+def test_video_track_records_boxes_per_sampled_frame():
+    from PIL import Image
+    from turtles.backend.video_track import track
+    seen = []
+    def fake(im, conf): seen.append(conf); return [(10.4, 20.6, 50.0, 60.0, 0.81234)] if len(seen) == 2 else []
+    rows, ms = track([Image.new("RGB", (64, 64))] * 3, 1, fake)
+    assert [r["t"] for r in rows] == [0, 1, 2] and rows[1]["boxes"] == [[10, 21, 50, 60, 0.812]] and seen == [0.25] * 3
+
+
+def test_flight_video_screen_is_wired():
+    html = (api.ROOT / "ui_docs" / "index.html").read_text()
+    assert 'id="btnVideo"' in html and 'id="vvVideo"' in html and "API_BASE + '/videos'" in html
+    assert "not real-time" in html and "a person confirms" in html                     # honest caption, always shown

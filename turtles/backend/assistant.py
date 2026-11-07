@@ -291,8 +291,19 @@ FAST_NOTE = ("\n- What they say reaches you through speech-to-text. Numbers ofte
              "to/too = 2, won = 1, tree = 3, ate = 8, sex/sicks = 6, and \"Spotify\" = \"spot five\". Read the spot number that fits "
              "the spots that exist and what they are doing; if it is still unclear, ask in a few words."
              "\n- [Screen now: ...] lists every open spot by distance when GPS is on (open spots by distance); use it for 'closest' and 'where am I'."
-             "\n- To log what someone found by voice, use update_alert (status + record for the field log). Use control_app "
-             "press_status / set_field / save_sheet only when they ask to fill or press the sheet on screen."
+             "\n- Field log by voice: fill the sheet ON SCREEN so they see it. control_app press_status (relocated / confirmed / false_alarm, "
+             "with the spot) opens it; then set_fields with every value they said in one call (keys from [Screen now] field_log_fields: "
+             "species, species_other, sex, age_class, mass_g, scl_mm, width_mm, height_mm, plastron_mm, encounter_type, substrate, "
+             "circumstances, exam.posture ... exam.gait = WNL / ABN / NE, findings, photos, disposition, disposition_location); set_note for "
+             "the free note. Units they say (inches, pounds, cm) are converted by the app. Only call save_sheet when they say save / done / "
+             "that's it; that save is the log, so do NOT also call update_alert. Use update_alert only when no sheet is involved."
+             "\n- Images: each spot in [Alerts now] says photo or NO image. 'Open / show the image (photo, picture, close-up) of spot N' = "
+             "control_app open_photo. If that spot has NO image, don't call it; say plainly it has no image (test spots were placed by hand). "
+             "'Close the image' = close_photo."
+             "\n- Flight video: [Screen now] flight_video says if one exists. 'Show me the video' = open_video; play, pause, restart, skip, "
+             "'next detection', weak boxes = control_app video. If there is none, say there's no flight video loaded. Describe the video "
+             "honestly: recorded, analyzed after landing, not live."
+             "\n- Spot numbers that don't exist: say 'There's no spot N' and name the range that does. Never invent a spot, photo, video or value."
              "\n- Screen commands (zoom, layers, tabs, open a spot, guidance): answer in a few words, like \"Done, Spot 3 is "
              "open.\" Don't add the alert status or ask about another spot unless they asked."
              "\n- \"Zoom in to / into / on spot N\" = control_app zoom_to_spot with that spot (it closes any other open spot). "
@@ -348,6 +359,7 @@ def ask_claude(store: AlertStore, text: str, alert_id: Optional[str], history: L
     open_now = sorted((a for a in store.list() if a["status"] == "open"), key=priority)
     context = f"[Open now, in priority order ({len(open_now)}): " + (", ".join(f"Spot {a.get('number')}" for a in open_now) or "none") + "] " + context
     context = "[Alerts now: " + "; ".join(f"#{a.get('number')} {a.get('name') or a['alert_id']} ({a['alert_id']}): {a['status']}, {source(a)}"
+                                         + (", photo" if a.get("thumbnail") else ", NO image")
                                          + (f", {a['species']}" if a.get("species") else "") for a in store.list()) + "] " + screen_text(screen) + context
     tools = [control_tool(catalog) if t["name"] == "control_app" else t for t in TOOLS]
     messages = [*clean_history(history), {"role": "user", "content": context + text}]
@@ -405,6 +417,8 @@ def unsaved_claim(store: AlertStore, text: str, actions: List[Dict[str, Any]]) -
     if not any("already" not in text[max(0, m.start() - 14):m.start()].lower() for m in CLAIM.finditer(text)): return None
     numbers = {a.get("number"): a for a in store.list()}
     stale = sorted(n for n in {int(x) for x in re.findall(r"\b(\d{1,3})\b", text)} if n in numbers and numbers[n]["status"] == "open")
+    # a Save pressed on the on-screen field log is a real save: the app sends it right after this reply
+    if any(x["tool"] == "control_app" and (x["input"].get("action") == "save_sheet") for x in actions): return None
     if stale: return stale
     return [] if not any(x["tool"] == "update_alert" for x in actions) else None
 

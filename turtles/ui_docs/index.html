@@ -232,6 +232,63 @@
       font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; transition: opacity .25s ease, transform .25s ease; }
     #toast.on { opacity: 1; transform: translate(-50%, 0); }
 
+    /* [A.E.R.O. UI] full-screen views glitch in and out exactly like the loading screen:
+       IN  = scan lines + green flash + a bright scan bar running down, a boot log line, panels slice in (bootIn), title RGB split
+       OUT = hard jitter + strobing scan lines + flash + log ("> CLOSING"), then the CRT power-down (squeeze to a line, then a dot) */
+    .glx-fx { position: absolute; inset: 0; z-index: 20; pointer-events: none; display: none; overflow: hidden; }
+    .glx-in > .glx-fx, .glx-exit > .glx-fx { display: block; }
+    .glx-fx .gx-lines { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0,0,0,.4) 0 1px, transparent 1px 3px), repeating-linear-gradient(0deg, rgba(74,222,128,.10) 0 1px, transparent 1px 4px); }
+    .glx-fx .gx-flash { position: absolute; inset: 0; background: #DCFCE7; mix-blend-mode: overlay; opacity: 0; }
+    .glx-fx .gx-bar { position: absolute; left: 0; right: 0; top: 0; height: 140px; background: linear-gradient(180deg, transparent, rgba(74,222,128,.10) 70%, rgba(74,222,128,.55) 97%, rgba(220,252,231,.9) 100%); opacity: 0; }
+    .glx-fx .gx-log { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 8px 14px; border: 1px solid rgba(74,222,128,.5); background: rgba(5,11,7,.85); color: #4ADE80; font: 500 12px var(--font-mono); letter-spacing: .18em; text-transform: uppercase; white-space: nowrap; animation: gxRe .32s steps(1, end) infinite; }
+    .glx-in > .glx-fx .gx-lines { animation: bootLines .95s ease-out both; }
+    .glx-in > .glx-fx .gx-flash { animation: gxFlash .7s steps(1, end) both; }
+    .glx-in > .glx-fx .gx-bar { animation: bootScan .8s cubic-bezier(.5, 0, .6, 1) .08s both; }
+    .glx-in > .glx-fx .gx-log { animation: gxRe .32s steps(1, end) infinite, gxLogOut .42s steps(1, end) both; }
+    .glx-in > :not(.glx-fx) { animation: bootIn .75s steps(1, end) .16s both; }
+    .glx-in > :not(.glx-fx):nth-child(3) { animation-delay: .26s; } .glx-in > :not(.glx-fx):nth-child(4) { animation-delay: .36s; }
+    .glx-in h2, .glx-in figcaption { animation: bootRgb .9s steps(1, end) .2s both; }
+    .glx-exit > .glx-fx .gx-lines { animation: gxStrobe .12s steps(2, end) infinite; }
+    .glx-exit > .glx-fx .gx-flash { animation: gxFlash .7s steps(1, end) both; }
+    .glx-exit > :not(.glx-fx) { animation: gxRe .32s steps(1, end) infinite; }
+    .glx-off { animation: gxOff .5s cubic-bezier(.7, 0, .9, .4) both !important; pointer-events: none; }
+    .glx-host { transform-origin: 50% 50%; }
+    @keyframes gxRe { 0% { transform: translateX(-8px); clip-path: inset(40% 0 42% 0); } 14% { transform: translateX(6px) skewX(-10deg); clip-path: inset(6% 0 70% 0); } 28% { opacity: .4; transform: translateX(-4px); clip-path: inset(60% 0 8% 0); } 42% { opacity: 1; transform: translateX(3px); clip-path: none; } 56% { transform: translateX(-2px) skewX(6deg); clip-path: inset(30% 0 34% 0); } 70%, 100% { transform: none; clip-path: none; } }
+    @keyframes gxStrobe { 0% { opacity: .9; } 50% { opacity: .5; } }
+    @keyframes gxFlash { 0% { opacity: .5; } 6% { opacity: 0; } 30% { opacity: .35; } 34% { opacity: 0; } 62% { opacity: .25; } 66%, 100% { opacity: 0; } }
+    @keyframes gxOff { 0% { transform: none; filter: none; } 45% { transform: scale(1, .006); filter: brightness(4) saturate(.4); } 75% { transform: scale(.6, .004); filter: brightness(5); opacity: 1; } 100% { transform: scale(0, .002); filter: brightness(6); opacity: 0; } }
+    @keyframes gxLogOut { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .glx-fx { display: none !important; } .glx-in > *, .glx-exit > *, .glx-off, .glx-in h2, .glx-in figcaption { animation: none !important; } }
+
+    /* [A.E.R.O. UI] drone close-up, full screen: tap the photo in the details, X top left to close */
+    .detail-photo img { cursor: zoom-in; }
+    #photoView { position: fixed; inset: 0; z-index: 10060; display: none; align-items: center; justify-content: center; padding: 64px 24px 24px; background: rgba(2, 8, 4, .86); }
+    #photoView.open { display: flex; }
+    #photoView figure { position: relative; margin: 0; display: flex; flex-direction: column; max-width: 92vw; max-height: calc(100dvh - 96px); border: 1px solid var(--accent); border-radius: 8px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px rgba(74,222,128,.15), 0 30px 80px rgba(0,0,0,.6); }
+    #photoView img { display: block; min-height: 0; max-width: 92vw; max-height: calc(100dvh - 150px); width: auto; height: auto; object-fit: contain; image-rendering: auto; }
+    #photoView figcaption { padding: 10px 14px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #9FB3A5; background: #050B07; border-top: 1px solid #1C2E21; }
+    #pvClose { position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 14px; z-index: 6; width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--accent); background: #050B07; color: #E6EDE7; cursor: pointer; }
+    #pvClose .icon { width: 22px; height: 22px; }
+    @media (max-width: 768px) { #photoView { padding: 72px 10px 16px; } #photoView img { max-width: 96vw; } }
+
+    /* [A.E.R.O. UI] flight video: recorded drone video with the detector's boxes drawn over it */
+    #videoView { position: fixed; inset: 0; z-index: 10050; display: none; flex-direction: column; background: var(--bg); color: var(--ink); }
+    #videoView.open { display: flex; }
+    .vv-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+    .vv-head h2 { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: 18px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vv-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel); color: var(--ink); font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+    .vv-btn[aria-pressed="true"] { color: var(--accent-text); background: var(--accent-soft); border-color: var(--accent); }
+    .vv-stage { position: relative; flex: 1; min-height: 0; background: #000; }
+    .vv-stage video, .vv-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+    .vv-stage canvas { pointer-events: none; }
+    .vv-foot { padding: 10px 16px 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+    .vv-line { position: relative; height: 22px; border-radius: 4px; background: var(--panel-2); cursor: pointer; overflow: hidden; }
+    .vv-line i { position: absolute; top: 3px; bottom: 3px; width: 3px; border-radius: 1px; }
+    .vv-line b { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); }
+    .vv-cap { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+    .vv-cap strong { color: var(--ink); font-weight: 500; }
+    .vv-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+    .vv-row select { min-height: 36px; background: var(--panel); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 6px; padding: 0 8px; font: inherit; }
     @media (max-width: 1100px) { .brand-sub { display: none; } .map-legend { display: none; } }
     @media (max-width: 768px) {
       header { height: calc(56px + env(safe-area-inset-top)); padding-left: 12px; padding-right: 12px; }
@@ -255,7 +312,7 @@
       .detail-name { font-size: 24px; } .relocation-instruction { font-size: 19px; }
       .detail-photo img { max-height: 30vh; }   /* leave room for the relocation advice in the sheet */
       .leaflet-control-zoom { display: none; }
-      html body #ht-dock { right: 14px; bottom: calc(48% + 14px); transition: bottom .25s ease; flex-direction: column-reverse; align-items: center; }
+      html body #ht-dock { right: auto; left: 14px; bottom: calc(48% + 14px); transition: bottom .25s ease; flex-direction: column-reverse; align-items: center; }   /* left edge: the map buttons run down the right edge */
       html body.sheet-down #ht-dock { bottom: calc(92px + env(safe-area-inset-bottom)); }
       html body.detail-open #ht-dock { bottom: auto; top: calc(70px + env(safe-area-inset-top)); right: auto; left: 12px; flex-direction: column; }
     }
@@ -373,6 +430,7 @@
     <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
     <symbol id="i-nav" viewBox="0 0 24 24"><path d="M12 2l7 19-7-4-7 4z"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3z"/></symbol>
     <symbol id="i-me" viewBox="0 0 24 24"><path d="M3.5 10.5L20.5 3.5l-7 17-2.2-7.8z"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
     <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5"/></symbol>
@@ -417,6 +475,9 @@
       </button>
       <button class="btn-map-tool" id="btnLocate" onclick="locateMe()" title="My location">
         <svg class="icon"><use href="#i-me"/></svg><span class="t">My location</span>
+      </button>
+      <button class="btn-map-tool" id="btnVideo" onclick="openVideo()" title="Flight video" style="display:none">
+        <svg class="icon"><use href="#i-video"/></svg><span class="t">Flight video</span>
       </button>
     </div>
 
@@ -1567,5 +1628,119 @@
 </script>
 
 
+  <!-- [A.E.R.O. UI] drone close-up, full screen -->
+  <div id="photoView" class="glx-host" role="dialog" aria-modal="true" aria-label="Drone close-up, full screen">
+    <button id="pvClose" type="button" onclick="closePhoto()" aria-label="Close the photo"><svg class="icon"><use href="#i-x"/></svg></button>
+    <figure><img id="pvImg" alt=""><figcaption id="pvCap"></figcaption></figure>
+  </div>
+  <script>
+  // glitch a full-screen view in or out, like the loading screen (its ENTER exit and the dashboard's boot-in); done() runs at the end
+  function aeroGlitch(el, dir, done) {
+    let fx = el.querySelector(':scope > .glx-fx');
+    if (!fx) { fx = document.createElement('div'); fx.className = 'glx-fx'; fx.innerHTML = '<i class="gx-lines"></i><i class="gx-flash"></i><i class="gx-bar"></i><b class="gx-log"></b>'; el.appendChild(fx); }
+    (el._glxT || []).forEach(clearTimeout); el.classList.remove('glx-in', 'glx-exit', 'glx-off'); void el.offsetWidth;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { done && done(); return; }
+    const log = fx.querySelector('.gx-log'), at = (ms, f) => el._glxT.push(setTimeout(f, ms)); el._glxT = [];
+    if (dir === 'in') {
+      el.classList.add('glx-in');
+      ['> LINK', '> DECODE', '> OK'].forEach((t, i) => at(i * 120, () => { log.textContent = t; }));
+      at(1000, () => { el.classList.remove('glx-in'); done && done(); });
+    } else {
+      el.classList.add('glx-exit');
+      ['> CLOSING', '> RELEASE · OK'].forEach((t, i) => at(i * 150, () => { log.textContent = t; }));
+      at(360, () => el.classList.add('glx-off'));
+      at(860, () => { el.classList.remove('glx-exit', 'glx-off'); done && done(); });
+    }
+  }
+  // a = the spot (A.E.R.O. "open the image of spot 9"); no a = the photo in the open details (a tap)
+  function openPhoto(a) {
+    const v = document.getElementById('photoView'), img = document.getElementById('pvImg');
+    a = a && a.alert_id ? a : activeAlert; if (!a || !a.thumbnail) return false;
+    img.src = API_BASE + '/' + a.thumbnail; img.alt = `Drone close-up of ${alertName(a)}`;
+    document.getElementById('pvCap').innerText = `(${alertNum(a)}) drone close-up · look for this` + (a.score != null ? ` · ${Math.round(a.score * 100)}%` : '');
+    if (v.classList.contains('open')) return true;
+    v.classList.add('open'); aeroGlitch(v, 'in'); return true;
+  }
+  function closePhoto() { const v = document.getElementById('photoView'); if (v.classList.contains('open')) aeroGlitch(v, 'out', () => v.classList.remove('open')); }
+  document.getElementById('detailPhoto').addEventListener('click', () => openPhoto());
+  document.getElementById('photoView').addEventListener('click', e => { if (e.target.id === 'photoView') closePhoto(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('photoView').classList.contains('open')) { e.stopImmediatePropagation(); closePhoto(); } }, true);
+  </script>
+
+  <!-- [A.E.R.O. UI] flight video: recorded drone video + the detector's boxes (analyzed after landing, not live) -->
+  <div id="videoView" class="glx-host" role="dialog" aria-modal="true" aria-labelledby="vvTitle">
+    <div class="vv-head">
+      <button class="vv-btn" onclick="closeVideo()"><svg class="icon"><use href="#i-back"/></svg>Map</button>
+      <h2 id="vvTitle">Flight video</h2>
+      <button class="vv-btn" id="vvWeak" aria-pressed="false" onclick="vvToggleWeak()" title="Also show weak boxes (25 to 50%)">Weak boxes</button>
+    </div>
+    <div class="vv-stage"><video id="vvVideo" playsinline controls preload="metadata"></video><canvas id="vvCanvas"></canvas></div>
+    <div class="vv-foot">
+      <div class="vv-row"><span id="vvNow">No detection in this second</span><span style="flex:1"></span><select id="vvPick" onchange="vvLoad(this.value)" aria-label="Video"></select></div>
+      <div class="vv-line" id="vvLine" title="Seconds where the detector drew a box: tap to jump there"><b id="vvHead"></b></div>
+      <p class="vv-cap" id="vvCap"></p>
+    </div>
+  </div>
+  <script>
+  // [A.E.R.O. UI] flight video. Track = GET /videos/<name>.json: {src_size, sample_fps, ms_per_frame, model, frames: [{t, boxes: [[x0,y0,x1,y1,score]]}]}
+  let vvList = [], vvTrack = null, vvWeakOn = false, vvRaf = 0;
+  const vvFloor = () => vvWeakOn ? 0.25 : 0.5;
+  const vvColor = s => getComputedStyle(document.documentElement).getPropertyValue(s >= 0.7 ? '--high' : s >= 0.5 ? '--review' : '--muted').trim() || '#f00';
+  async function vvInit() {
+    try { const r = await fetch(API_BASE + '/videos'); if (!r.ok) return; vvList = (await r.json()).filter(v => v.track); } catch (e) { return; }
+    if (!vvList.length) return;
+    document.getElementById('btnVideo').style.display = '';
+    document.getElementById('vvPick').innerHTML = vvList.map(v => `<option value="${v.name}">${v.title || v.name}</option>`).join('');
+    document.getElementById('vvPick').style.display = vvList.length > 1 ? '' : 'none';
+  }
+  function openVideo() { const w = document.getElementById('videoView'); w.classList.add('open'); aeroGlitch(w, 'in'); if (!vvTrack && vvList.length) vvLoad(vvList[0].name); }
+  function closeVideo() { const v = document.getElementById('vvVideo'), w = document.getElementById('videoView'); v.pause(); if (w.classList.contains('open')) aeroGlitch(w, 'out', () => w.classList.remove('open')); }
+  function vvToggleWeak() { vvWeakOn = !vvWeakOn; document.getElementById('vvWeak').setAttribute('aria-pressed', vvWeakOn); vvTimeline(); vvDraw(); }
+  async function vvLoad(name) {
+    const meta = vvList.find(v => v.name === name); if (!meta) return;
+    vvTrack = await (await fetch(API_BASE + '/' + meta.track)).json();
+    const v = document.getElementById('vvVideo'); v.src = API_BASE + '/' + meta.video;
+    document.getElementById('vvTitle').innerText = vvTrack.title || name;
+    const sec = (vvTrack.ms_per_frame / 1000).toFixed(1);
+    document.getElementById('vvCap').innerHTML = (vvTrack.caption ? `<strong>${esc(vvTrack.caption)}</strong> ` : '')
+      + `Recorded drone video, analyzed after landing: model ${esc(vvTrack.model)} checked one frame every ${(1 / vvTrack.sample_fps).toFixed(0)} s `
+      + `(${sec} s per frame on this laptop, so not real-time yet). Boxes: red 70%+, amber 50 to 70%. The model marks what looks like a turtle; a person confirms.`;
+    v.onloadedmetadata = () => { vvTimeline(); vvDraw(); };
+    v.onplay = () => { cancelAnimationFrame(vvRaf); const loop = () => { vvDraw(); if (!v.paused) vvRaf = requestAnimationFrame(loop); }; loop(); };
+    v.onseeked = v.onpause = vvDraw;
+  }
+  function vvFrame(t) {   // the analyzed frame for this moment (each one stands for 1/fps seconds)
+    if (!vvTrack) return null; const half = 0.5 / vvTrack.sample_fps;
+    return vvTrack.frames.find(f => Math.abs(f.t - t) <= half) || null;
+  }
+  function vvTimeline() {
+    const v = document.getElementById('vvVideo'), line = document.getElementById('vvLine'), dur = v.duration || (vvTrack.frames.at(-1).t + 1);
+    line.querySelectorAll('i').forEach(n => n.remove());
+    vvTrack.frames.forEach(f => { const s = Math.max(0, ...f.boxes.map(b => b[4])); if (s < vvFloor()) return;
+      const i = document.createElement('i'); i.style.left = (100 * f.t / dur) + '%'; i.style.background = vvColor(s); i.title = `${f.t.toFixed(0)} s: ${Math.round(s * 100)}%`; line.appendChild(i); });
+    line.onclick = e => { const r = line.getBoundingClientRect(); v.currentTime = dur * (e.clientX - r.left) / r.width; };
+  }
+  function vvDraw() {
+    const v = document.getElementById('vvVideo'), c = document.getElementById('vvCanvas'), dpr = window.devicePixelRatio || 1;
+    const W = c.clientWidth, H = c.clientHeight; c.width = W * dpr; c.height = H * dpr;
+    const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    if (!vvTrack || !v.videoWidth) return;
+    const k = Math.min(W / v.videoWidth, H / v.videoHeight), ox = (W - v.videoWidth * k) / 2, oy = (H - v.videoHeight * k) / 2;
+    const sx = v.videoWidth * k / vvTrack.src_size[0], sy = v.videoHeight * k / vvTrack.src_size[1];
+    const f = vvFrame(v.currentTime), shown = f ? f.boxes.filter(b => b[4] >= vvFloor()) : [];
+    shown.forEach(([x0, y0, x1, y1, s]) => {
+      const pad = 10, x = ox + x0 * sx - pad, y = oy + y0 * sy - pad, w = (x1 - x0) * sx + 2 * pad, h = (y1 - y0) * sy + 2 * pad, col = vvColor(s);
+      g.lineWidth = 2.5; g.strokeStyle = col; g.strokeRect(x, y, w, h);
+      g.font = '600 12px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); const txt = Math.round(s * 100) + '%';
+      g.fillStyle = col; g.fillRect(x, y - 18, g.measureText(txt).width + 10, 18); g.fillStyle = '#000'; g.fillText(txt, x + 5, y - 5);
+    });
+    const best = Math.max(0, ...shown.map(b => b[4]));
+    document.getElementById('vvNow').innerText = shown.length ? `${Math.floor(v.currentTime)} s · ${shown.length} box${shown.length > 1 ? 'es' : ''} · best ${Math.round(best * 100)}%` : `${Math.floor(v.currentTime)} s · no detection in this second`;
+    document.getElementById('vvHead').style.left = (100 * v.currentTime / (v.duration || 1)) + '%';
+  }
+  window.addEventListener('resize', () => { if (document.getElementById('videoView').classList.contains('open')) vvDraw(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('videoView').classList.contains('open')) closeVideo(); });
+  vvInit();
+  </script>
 </body>
 </html>

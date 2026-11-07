@@ -142,11 +142,14 @@
   function act(t) { if (!t) return; const d = document.createElement('div'); d.className = 'act'; d.textContent = t; $('#ht-log').appendChild(d); $('#ht-log').scrollTop = 1e9; }
   // run each command on the page (aero-control.js); its answer ("Fence band on", "No spot 9") is the → line in the chat
   function runUi(cmds, quiet) {
+    const out = [];
     (cmds || []).forEach(c => {
       let res = null; try { res = cfg.onCommand ? cfg.onCommand(c) : null; } catch (e) { res = "Couldn't: " + e.message; console.warn('A.E.R.O. command', c, e); }
       if (!quiet || typeof res === 'string') act(typeof res === 'string' ? res : actionText({ tool: 'control_app', input: c }));
+      if (typeof res === 'string') out.push(res);
       window.dispatchEvent(new CustomEvent('heyturtle:command', { detail: c }));
     });
+    return out;
   }
 
   // speech-to-text hears spot numbers as sound-alikes ("spot for", "Spotify", "close by 3:00"): fix the common ones
@@ -177,6 +180,17 @@
     if ((m = t.match(/^zoom (in|out)( a lot| more| all the way)?$/))) return { action: 'zoom_' + m[1], value: m[2] ? '3' : '1' };
     if (/^(re ?cent(er|re)|center|centre)( the)?( map| site| on the site)?$/.test(t)) return { action: 'recenter' };
     if ((m = t.match(/^(switch to |turn on |go |use )?(dark|light|night|day) (mode|theme)$/))) return { action: 'theme', value: /dark|night/.test(m[2]) ? 'dark' : 'light' };
+    const SPOT = '(?:spot|alert|pin) (\\d+|\\w+)';
+    if ((m = t.match(new RegExp('^(show|open|pull up|bring up|expand|enlarge|zoom in on)( me)?( the)? (image|photo|picture|close ?up|close-up)( of| for| on)?( the)? ' + SPOT + '$'))) && (+m[7] || NUM[m[7]])) return { action: 'open_photo', args: { spot: +m[7] || NUM[m[7]] } };
+    if ((m = t.match(new RegExp('^(show|open|pull up|bring up)( me)? ' + SPOT + "(?:'s)? (image|photo|picture|close ?up|close-up)$"))) && (+m[3] || NUM[m[3]])) return { action: 'open_photo', args: { spot: +m[3] || NUM[m[3]] } };
+    if (/^(show|open|pull up|bring up|expand|enlarge)( me)?( the| this| its| that)? (image|photo|picture|close ?up|close-up)$/.test(t)) return { action: 'open_photo' };
+    if (/^(close|hide|exit|dismiss)( the| this)? (image|photo|picture|close ?up|close-up)$/.test(t)) return { action: 'close_photo' };
+    if (/^(show|open|play|pull up|bring up|start)( me)?( the)?( flight| drone)? (video|footage)$/.test(t)) return { action: 'open_video' };
+    if (/^(close|hide|exit|stop)( the)?( flight| drone)? (video|footage)$|^back to the map$/.test(t)) return { action: 'close_video' };
+    if (/^(pause)( the)?( video)?$/.test(t)) return { action: 'video', args: { do: 'pause' } };
+    if (/^(play|resume)( the)?( video)?$/.test(t)) return { action: 'video', args: { do: 'play' } };
+    if (/^(restart|replay)( the)?( video)?$|^play it again$/.test(t)) return { action: 'video', args: { do: 'restart' } };
+    if (/^(next|skip to the next|jump to the next|go to the next) (detection|box|turtle)$/.test(t)) return { action: 'video', args: { do: 'next_detection' } };
     if (/^(show|open|go to|pull up)( me)?( the)? flight(s| windows?)$/.test(t)) return { action: 'tab', value: 'flights' };
     if (/^(show|open|go to|pull up)( me)?( the)?( open)? alerts( list)?$/.test(t)) return { action: 'tab', value: 'alerts' };
     if ((m = t.match(/^(zoom|zoom in|zoom into|zoom in to|zoom in on|zoom on|zoom to|zoom onto|zoom over to)( the)? (spot|alert|pin) (\d+|\w+)$/)) && (+m[4] || NUM[m[4]])) return { action: 'zoom_to_spot', args: { spot: +m[4] || NUM[m[4]] } };
@@ -212,7 +226,11 @@
     if (busy && inflight) { inflight.abort(); $('#ht-log .thinking') && $('#ht-log .thinking').remove(); busy = false; }
     if (busy) return; if (!logged) log('u', text);
     const quick = localCommand(text);
-    if (quick) { runUi([quick]); $('#ht-mode').textContent = 'mode: instant (on this device)'; return; }
+    if (quick) {   // instant: done on the phone; hands-free still hears what happened ("Spot 3 has no image ...")
+      const said = runUi([quick]).join('. '); $('#ht-mode').textContent = 'mode: instant (on this device)';
+      if (hands && said) { log('b', said); speak(said); }
+      return;
+    }
     busy = true; $('#ht-btn').classList.add('busy');
     const think = line('b thinking', 'A.E.R.O.', ''); think.lastChild.textContent = 'thinking'; const dots = document.createElement('span'); dots.className = 'dots'; think.appendChild(dots);
     $('#ht-log').appendChild(think); $('#ht-log').scrollTop = 1e9;
