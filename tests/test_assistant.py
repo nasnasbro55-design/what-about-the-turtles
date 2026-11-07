@@ -297,3 +297,22 @@ def test_partial_save_is_caught(tmp_path):
     assert unsaved_claim(s, "Spots 1 and 2 are marked as false alarms.", acts) == [2]
     assert unsaved_claim(s, "Spot 1 is marked as a false alarm.", acts) is None
     assert unsaved_claim(s, "Spot 2 is next, about 40 feet north.", []) is None
+
+
+def test_save_on_the_sheet_counts_as_a_save(tmp_path):
+    """Filling the on-screen field log and pressing Save is a real save: no forced update_alert on top of it."""
+    from turtles.backend.assistant import unsaved_claim
+    s = store(tmp_path)
+    acts = [{"tool": "control_app", "input": {"action": "press_status", "args": {"status": "confirmed", "spot": 1}}},
+            {"tool": "control_app", "input": {"action": "set_fields", "args": {"values": {"sex": "Male"}}}},
+            {"tool": "control_app", "input": {"action": "save_sheet"}}]
+    assert unsaved_claim(s, "Saved Spot 1 as confirmed, a male.", acts) is None
+    assert unsaved_claim(s, "Saved Spot 1 as confirmed, a male.", acts[:2]) == [1]   # filled but never saved
+
+
+def test_claude_is_told_which_spots_have_a_photo(tmp_path):
+    s = store(tmp_path); s.get("spot-1")["thumbnail"] = "thumbnails/x.jpg"
+    c = FakeClaude([say("Spot 2 has no image.")])
+    respond(s, "open the image of spot 2", None, client=c)
+    ctx = c.seen[0]["messages"][-1]["content"]
+    assert "Spot 1: Open bare dirt (spot-1): open, test spot (no score), photo" in ctx and "Rut (spot-2): open, test spot (no score), NO image" in ctx

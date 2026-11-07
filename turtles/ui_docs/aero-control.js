@@ -76,12 +76,32 @@
       const vals = d.multi ? String(value).split(/,|\band\b/).map(x => matchOption(d.options, x)).filter(Boolean) : [matchOption(d.options, value)];
       if (!vals[0]) return `${d.label}: choose ${d.options.join(', ')}`;
       if (d.multi) { const set = new Set(logRec[k] || []); vals.forEach(v => set.add(v)); logRec[k] = [...set]; } else setRec(k, vals[0]);
-    } else if (d.number) { const n = parseFloat(String(value).replace(/[^\d.]/g, '')); if (isNaN(n)) return `${d.label} needs a number`; setRec(k, n); }
+    } else if (d.number) {   // "5 inches", "1.2 pounds", "14 cm" -> the sheet's own unit (mm or g)
+      const v = String(value).toLowerCase(), n0 = parseFloat(v.replace(/,/g, '').replace(/[^\d.]/g, '')); if (isNaN(n0)) return `${d.label} needs a number`;
+      const f = d.unit === 'mm' ? (/inch|\bin\b|"/.test(v) ? 25.4 : /\bcm|centi/.test(v) ? 10 : 1) : d.unit === 'g' ? (/pound|\blbs?\b/.test(v) ? 453.6 : /ounce|\boz\b/.test(v) ? 28.35 : /\bkg|kilo/.test(v) ? 1000 : 1) : 1;
+      setRec(k, Math.round(n0 * f * 10) / 10); }
     else setRec(k, String(value).trim());
     paintLog();
     const el = $(`#noteModal [data-k="${k}"]`); if (el) { const det = el.closest('details'); if (det) det.open = true; press(el); }
     return `${d.label} set to ${d.multi ? logRec[k].join(', ') : getRec(k)}${d.unit ? ' ' + d.unit : ''}`;
   }
+
+  // open the field log for a spot right now (synchronously, so set_field in the same turn finds it open)
+  function openSheet(s, status) {
+    if (!s) return 'Open or name a spot first';
+    if (noteOpen()) closeNote(null);
+    if (!activeAlert || activeAlert.alert_id !== s.alert_id) focusSpot(s, 19);
+    const k = STATUS_KEY[status] || (s.status !== 'open' ? s.status : 'confirmed');
+    press({ relocated: '.btn-relocated', confirmed: '.btn-confirmed', false_positive: '.btn-fp' }[k]);
+    updateAlertStatus(k); return k;
+  }
+  const photoOpen = () => $('#photoView') && $('#photoView').classList.contains('open');
+  const videoOpen = () => $('#videoView') && $('#videoView').classList.contains('open');
+  const hasVideo = () => typeof vvList !== 'undefined' && vvList.length > 0;
+  function noPhotoWhy(s) { return s.score == null ? `${spotName(s)} has no image: it's a test spot placed by hand, not a drone detection` : `${spotName(s)} has no close-up image saved`; }
+  // run f once the flight video has loaded (it loads when the screen opens)
+  function whenVideo(f) { const v = $('#vvVideo'), t0 = Date.now(); (function w() { if (v && v.readyState >= 1 && typeof vvTrack !== 'undefined' && vvTrack) f(v); else if (Date.now() - t0 < 6000) setTimeout(w, 150); })(); }
+  function closeOverlays() { if (photoOpen()) closePhoto(); }
 
   // ---- every action A.E.R.O. can take, with its arguments ----
   const ACTIONS = {
@@ -117,7 +137,7 @@
                     else { const i = activeAlert ? alerts.indexOf(activeAlert) : -1, list = a.which === 'previous' ? alerts.slice().reverse() : alerts, j = a.which === 'previous' ? alerts.length - 1 - i : i;
                            s = list.slice(j + 1).find(x => x.status === 'open') || list.find(x => x.status === 'open'); }
                     return ACTIONS.open_spot.run({ spot: num(s) }); } },
-    close_spot: { say: 'Close the open spot\'s details', run: () => { if (noteOpen()) closeNote(null); closeDetail(); return 'Closed the details'; } },
+    close_spot: { say: 'Close the open spot\'s details', run: () => { closeOverlays(); if (noteOpen()) closeNote(null); closeDetail(); return 'Closed the details'; } },
     navigate:   { say: 'Walking guidance inside the app from my GPS position', args: { spot: 'spot number (default: the open spot)', to: 'turtle|release (release = Tanya\'s release point)' }, run: a => {
                     const s = a.spot ? findSpot(a.spot) : activeAlert; if (!s) return 'Open or name a spot first';
                     if (!activeAlert || activeAlert.alert_id !== s.alert_id) openDetail(s);
@@ -127,12 +147,48 @@
                     return `Guiding you to ${a.to === 'release' ? 'the release point for ' : ''}${spotName(s)}`; } },
     stop_navigation: { say: 'Stop the walking guidance', run: () => { stopNav(); return 'Guidance stopped'; } },
     press_status: { say: 'Press a responder button on the open spot (opens the field log sheet like tapping it)', args: { status: 'relocated|confirmed|false_alarm', spot: 'optional spot number' }, run: a => {
-                    const s = a.spot ? findSpot(a.spot) : activeAlert; if (!s) return 'Open or name a spot first';
-                    if (!activeAlert || activeAlert.alert_id !== s.alert_id) openDetail(s);
-                    const k = STATUS_KEY[a.status]; if (!k) return 'Say relocated, confirmed or false alarm';
-                    press({ relocated: '.btn-relocated', confirmed: '.btn-confirmed', false_positive: '.btn-fp' }[k]);
-                    setTimeout(() => updateAlertStatus(k), 120); return `Opened the ${a.status.replace('_', ' ')} sheet for ${spotName(s)}`; } },
-    set_field:  { say: 'Fill a field in the open field log sheet', args: { field: 'field key (see screen field_log.fields)', value: 'value or option' }, run: a => noteOpen() ? setField(a.field, a.value) : 'Open the sheet first (press_status)' },
+                    const s = a.spot ? findSpot(a.spot) : activeAlert; if (!s) return a.spot ? `No spot ${a.spot}` : 'Open or name a spot first';
+                    if (!STATUS_KEY[a.status]) return 'Say relocated, confirmed or false alarm';
+                    closeOverlays(); openSheet(s, a.status); return `Opened the ${a.status.replace('_', ' ')} sheet for ${spotName(s)}`; } },
+    set_field:  { say: 'Fill one field of the field log sheet (opens the sheet for the open spot if it is closed)', args: { field: 'field key (see screen field_log_fields), e.g. sex, scl_mm, exam.carapace, photos', value: 'value or option; units like inches or pounds are converted' }, run: a => {
+                    let pre = ''; if (!noteOpen()) { const k = openSheet(activeAlert); if (!STATUS_KEY[k]) return k; pre = `Opened the ${k.replace('_', ' ')} sheet. `; }
+                    return pre + setField(a.field, a.value); } },
+    set_fields: { say: 'Fill several field log fields at once (faster than one call each)', args: { values: 'object of field key -> value, e.g. {"sex":"Male","scl_mm":"142","exam.carapace":"WNL"}' }, run: a => {
+                    let v = a.values || {}; if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { return 'values must be an object of field: value'; } }
+                    let pre = ''; if (!noteOpen()) { const k = openSheet(activeAlert); if (!STATUS_KEY[k]) return k; pre = `Opened the ${k.replace('_', ' ')} sheet. `; }
+                    return pre + Object.entries(v).map(([k, x]) => setField(k, x)).join('; '); } },
+    clear_field: { say: 'Clear a field log field (a correction)', args: { field: 'field key' }, run: a => {
+                    if (!noteOpen()) return 'No sheet open'; const f = fields(), k = f[a.field] ? a.field : Object.keys(f).find(x => x.endsWith('.' + a.field) || f[x].label.toLowerCase() === String(a.field).toLowerCase());
+                    if (!k) return `No field called ${a.field}`; if (f[k].multi) delete logRec[k]; else setRec(k, ''); paintLog(); return `${f[k].label} cleared`; } },
+    open_photo: { say: 'Open a spot\'s drone close-up image full screen (glitch transition)', args: { spot: 'spot number (default: the open spot)' }, run: a => {
+                    const s = a.spot ? findSpot(a.spot) : activeAlert; if (!s) return a.spot ? `No spot ${a.spot}` : 'Name a spot';
+                    if (!s.thumbnail) { if (!activeAlert || activeAlert.alert_id !== s.alert_id) focusSpot(s, 19); return noPhotoWhy(s); }
+                    if (videoOpen()) closeVideo(); if (noteOpen()) closeNote(null);
+                    if (!activeAlert || activeAlert.alert_id !== s.alert_id) focusSpot(s, 19);
+                    openPhoto(s); return `Showing the close-up of ${spotName(s)}`; } },
+    close_photo: { say: 'Close the full-screen image', run: () => { if (!photoOpen()) return 'No image open'; closePhoto(); return 'Image closed'; } },
+    open_video: { say: 'Open the flight video screen (recorded drone video with the detector\'s boxes)', args: { play: 'yes|no, default yes' }, run: a => {
+                    if (!hasVideo()) return 'No flight video on this server yet';
+                    closeOverlays(); if (noteOpen()) closeNote(null); if (!videoOpen()) { press('#btnVideo'); openVideo(); }
+                    if (a.play !== 'no') whenVideo(v => { v.muted = true; v.play().catch(() => {}); });
+                    return 'Flight video open'; } },
+    close_video: { say: 'Close the flight video and go back to the map', run: () => { if (!videoOpen()) return 'The video is not open'; closeVideo(); return 'Back to the map'; } },
+    video:      { say: 'Control the flight video (opens it if needed)', args: { do: 'play|pause|restart|forward|back|seek|next_detection|weak_on|weak_off', seconds: 'for seek: second to jump to; forward/back: how many (default 10)' }, run: a => {
+                    if (!hasVideo()) return 'No flight video on this server yet';
+                    if (!videoOpen()) { closeOverlays(); openVideo(); }
+                    const d = String(a.do || 'play').toLowerCase(), sec = parseFloat(a.seconds);
+                    if (/weak/.test(d)) { const on = !/off/.test(d); if (on !== vvWeakOn) vvToggleWeak(); return `Weak boxes ${on ? 'shown' : 'hidden'}`; }
+                    whenVideo(v => {
+                      if (d === 'pause') v.pause();
+                      else if (d === 'restart') { v.currentTime = 0; v.muted = true; v.play().catch(() => {}); }
+                      else if (d === 'forward' || d === 'back') v.currentTime = Math.max(0, Math.min(v.duration || 1e9, v.currentTime + (d === 'back' ? -1 : 1) * (sec || 10)));
+                      else if (d === 'seek') { if (!isNaN(sec)) v.currentTime = Math.max(0, Math.min(v.duration || 1e9, sec)); }
+                      else if (/next/.test(d)) { const f = vvTrack.frames.find(x => x.t > v.currentTime + 0.6 && x.boxes.some(b => b[4] >= vvFloor())) || vvTrack.frames.find(x => x.boxes.some(b => b[4] >= vvFloor()));
+                                                  if (f) { v.pause(); v.currentTime = Math.max(0, f.t - 0.2); } }
+                      else { v.muted = true; v.play().catch(() => {}); }
+                      vvDraw();
+                    });
+                    return { pause: 'Paused', restart: 'From the start', forward: 'Skipped ahead', back: 'Went back', seek: `Jumped to ${isNaN(sec) ? '?' : Math.round(sec)} s` }[d] || (/next/.test(d) ? 'Jumped to the next detection' : 'Playing'); } },
     set_note:   { say: 'Write the field note in the open sheet', args: { text: 'the note', mode: 'replace|append' }, run: a => {
                     if (!noteOpen()) return 'Open the sheet first (press_status)'; const t = $('#noteText');
                     t.value = a.mode === 'replace' || !t.value.trim() ? a.text : t.value.trim().replace(/[.,]$/, '') + '. ' + a.text; press(t); return 'Note updated'; } },
@@ -165,7 +221,8 @@
     if (activeAlert) {
       const a = activeAlert, rel = lastRelocation && lastRelocation.alert_id === a.alert_id ? lastRelocation : null;
       s.open_spot = `${spotName(a)} ${alertName(a).replace(/^Spot \d+:\s*/, '')} (${a.status}${a.species ? ', ' + a.species : ''}${a.sex ? ', ' + a.sex : ''})` +
-        (a.score == null ? '; test spot, no drone score' : `; drone ${Math.round(a.score * 100)}% ${a.confidence || 'review'}${a.thumbnail ? ', close-up photo shown in its details' : ''}`) +
+        (a.score == null ? '; test spot, no drone score' : `; drone ${Math.round(a.score * 100)}% ${a.confidence || 'review'}`) +
+        (a.thumbnail ? '; has a close-up image (open_photo shows it full screen)' : '; NO image') +
         (a.note ? `; note: ${a.note}` : '') + (rel ? `; relocation guide: ${Math.round(rel.distance_m)} m ${compass(rel.bearing_deg)}` : '') +
         (me ? `; you are ${Math.round(distM(me, a))} m ${compass(bearingTo(me, a))} of it` : '');
       const log = typeof logSummary === 'function' ? logSummary(a.record, a) : ''; if (log) s.open_spot += `; field log: ${log}`;
@@ -174,6 +231,10 @@
       const open = alerts.filter(a => a.status === 'open').map(a => [a, distM(me, a)]).sort((x, y) => x[1] - y[1]);
       if (open.length) s.open_spots_by_distance = open.map(([a, d]) => `${spotName(a)} ${Math.round(d)} m ${compass(bearingTo(me, a))}`).join('; ');
     }
+    if (photoOpen()) s.image_full_screen = 'open: ' + $('#pvCap').textContent;
+    if (!hasVideo()) s.flight_video = 'none on this server';
+    else if (!videoOpen()) s.flight_video = 'available, closed (' + vvList.map(v => v.title || v.name).join(', ') + ')';
+    else { const v = $('#vvVideo'); s.flight_video = `OPEN full screen: ${$('#vvTitle').textContent}, ${Math.floor(v.currentTime || 0)} of ${Math.floor(v.duration || 0)} s, ${v.paused ? 'paused' : 'playing'}, ${$('#vvNow').textContent}, weak boxes ${vvWeakOn ? 'on' : 'off'}`; }
     if (typeof nav !== 'undefined' && nav) s.guidance = `${nav.kind === 'release' ? 'to the release point of' : 'to'} Spot ${+nav.num}` +
       (me ? `, ${Math.round(distM(me, nav))} m ${compass(bearingTo(me, nav))}` : ', waiting for GPS') + (nav.arrived ? ', ARRIVED' : '');
     if (noteOpen()) {
@@ -188,7 +249,9 @@
 
   // ---- carry out one command; the result line goes into the chat ----
   function run(c) {
-    const name = c.action === 'open_alert' ? 'open_spot' : c.action === 'close_alert' ? 'close_spot' : c.action;
+    const ALIAS = { open_alert: 'open_spot', close_alert: 'close_spot', show_photo: 'open_photo', open_image: 'open_photo', show_image: 'open_photo',
+                    close_image: 'close_photo', show_video: 'open_video', play_video: 'open_video', flight_video: 'open_video', hide_video: 'close_video' };
+    const name = ALIAS[c.action] || c.action;
     const a = ACTIONS[name];
     if (!a) return `I can't do "${c.action}" yet`;
     const args = { ...(c.args || {}), ...c };   // accepts {action, args:{...}} and flat {action, spot, value}

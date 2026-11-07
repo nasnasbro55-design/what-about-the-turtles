@@ -1652,14 +1652,17 @@
       at(860, () => { el.classList.remove('glx-exit', 'glx-off'); done && done(); });
     }
   }
-  function openPhoto() {
-    const src = document.getElementById('detailPhoto'), v = document.getElementById('photoView'); if (!src.src) return;
-    document.getElementById('pvImg').src = src.src; document.getElementById('pvImg').alt = src.alt;
-    document.getElementById('pvCap').innerText = document.getElementById('detailPhotoCap').innerText;
-    v.classList.add('open'); aeroGlitch(v, 'in');
+  // a = the spot (A.E.R.O. "open the image of spot 9"); no a = the photo in the open details (a tap)
+  function openPhoto(a) {
+    const v = document.getElementById('photoView'), img = document.getElementById('pvImg');
+    a = a && a.alert_id ? a : activeAlert; if (!a || !a.thumbnail) return false;
+    img.src = API_BASE + '/' + a.thumbnail; img.alt = `Drone close-up of ${alertName(a)}`;
+    document.getElementById('pvCap').innerText = `(${alertNum(a)}) drone close-up · look for this` + (a.score != null ? ` · ${Math.round(a.score * 100)}%` : '');
+    if (v.classList.contains('open')) return true;
+    v.classList.add('open'); aeroGlitch(v, 'in'); return true;
   }
   function closePhoto() { const v = document.getElementById('photoView'); if (v.classList.contains('open')) aeroGlitch(v, 'out', () => v.classList.remove('open')); }
-  document.getElementById('detailPhoto').addEventListener('click', openPhoto);
+  document.getElementById('detailPhoto').addEventListener('click', () => openPhoto());
   document.getElementById('photoView').addEventListener('click', e => { if (e.target.id === 'photoView') closePhoto(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('photoView').classList.contains('open')) { e.stopImmediatePropagation(); closePhoto(); } }, true);
   </script>
