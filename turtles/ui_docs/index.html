@@ -232,6 +232,45 @@
       font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; transition: opacity .25s ease, transform .25s ease; }
     #toast.on { opacity: 1; transform: translate(-50%, 0); }
 
+    /* [A.E.R.O. UI] full-screen views glitch in and out exactly like the loading screen:
+       IN  = scan lines + green flash + a bright scan bar running down, a boot log line, panels slice in (bootIn), title RGB split
+       OUT = hard jitter + strobing scan lines + flash + log ("> CLOSING"), then the CRT power-down (squeeze to a line, then a dot) */
+    .glx-fx { position: absolute; inset: 0; z-index: 20; pointer-events: none; display: none; overflow: hidden; }
+    .glx-in > .glx-fx, .glx-exit > .glx-fx { display: block; }
+    .glx-fx .gx-lines { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0,0,0,.4) 0 1px, transparent 1px 3px), repeating-linear-gradient(0deg, rgba(74,222,128,.10) 0 1px, transparent 1px 4px); }
+    .glx-fx .gx-flash { position: absolute; inset: 0; background: #DCFCE7; mix-blend-mode: overlay; opacity: 0; }
+    .glx-fx .gx-bar { position: absolute; left: 0; right: 0; top: 0; height: 140px; background: linear-gradient(180deg, transparent, rgba(74,222,128,.10) 70%, rgba(74,222,128,.55) 97%, rgba(220,252,231,.9) 100%); opacity: 0; }
+    .glx-fx .gx-log { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 8px 14px; border: 1px solid rgba(74,222,128,.5); background: rgba(5,11,7,.85); color: #4ADE80; font: 500 12px var(--font-mono); letter-spacing: .18em; text-transform: uppercase; white-space: nowrap; animation: gxRe .32s steps(1, end) infinite; }
+    .glx-in > .glx-fx .gx-lines { animation: bootLines .95s ease-out both; }
+    .glx-in > .glx-fx .gx-flash { animation: gxFlash .7s steps(1, end) both; }
+    .glx-in > .glx-fx .gx-bar { animation: bootScan .8s cubic-bezier(.5, 0, .6, 1) .08s both; }
+    .glx-in > .glx-fx .gx-log { animation: gxRe .32s steps(1, end) infinite, gxLogOut .42s steps(1, end) both; }
+    .glx-in > :not(.glx-fx) { animation: bootIn .75s steps(1, end) .16s both; }
+    .glx-in > :not(.glx-fx):nth-child(3) { animation-delay: .26s; } .glx-in > :not(.glx-fx):nth-child(4) { animation-delay: .36s; }
+    .glx-in h2, .glx-in figcaption { animation: bootRgb .9s steps(1, end) .2s both; }
+    .glx-exit > .glx-fx .gx-lines { animation: gxStrobe .12s steps(2, end) infinite; }
+    .glx-exit > .glx-fx .gx-flash { animation: gxFlash .7s steps(1, end) both; }
+    .glx-exit > :not(.glx-fx) { animation: gxRe .32s steps(1, end) infinite; }
+    .glx-off { animation: gxOff .5s cubic-bezier(.7, 0, .9, .4) both !important; pointer-events: none; }
+    .glx-host { transform-origin: 50% 50%; }
+    @keyframes gxRe { 0% { transform: translateX(-8px); clip-path: inset(40% 0 42% 0); } 14% { transform: translateX(6px) skewX(-10deg); clip-path: inset(6% 0 70% 0); } 28% { opacity: .4; transform: translateX(-4px); clip-path: inset(60% 0 8% 0); } 42% { opacity: 1; transform: translateX(3px); clip-path: none; } 56% { transform: translateX(-2px) skewX(6deg); clip-path: inset(30% 0 34% 0); } 70%, 100% { transform: none; clip-path: none; } }
+    @keyframes gxStrobe { 0% { opacity: .9; } 50% { opacity: .5; } }
+    @keyframes gxFlash { 0% { opacity: .5; } 6% { opacity: 0; } 30% { opacity: .35; } 34% { opacity: 0; } 62% { opacity: .25; } 66%, 100% { opacity: 0; } }
+    @keyframes gxOff { 0% { transform: none; filter: none; } 45% { transform: scale(1, .006); filter: brightness(4) saturate(.4); } 75% { transform: scale(.6, .004); filter: brightness(5); opacity: 1; } 100% { transform: scale(0, .002); filter: brightness(6); opacity: 0; } }
+    @keyframes gxLogOut { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .glx-fx { display: none !important; } .glx-in > *, .glx-exit > *, .glx-off, .glx-in h2, .glx-in figcaption { animation: none !important; } }
+
+    /* [A.E.R.O. UI] drone close-up, full screen: tap the photo in the details, X top left to close */
+    .detail-photo img { cursor: zoom-in; }
+    #photoView { position: fixed; inset: 0; z-index: 10060; display: none; align-items: center; justify-content: center; padding: 64px 24px 24px; background: rgba(2, 8, 4, .86); }
+    #photoView.open { display: flex; }
+    #photoView figure { position: relative; margin: 0; display: flex; flex-direction: column; max-width: 92vw; max-height: calc(100dvh - 96px); border: 1px solid var(--accent); border-radius: 8px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px rgba(74,222,128,.15), 0 30px 80px rgba(0,0,0,.6); }
+    #photoView img { display: block; min-height: 0; max-width: 92vw; max-height: calc(100dvh - 150px); width: auto; height: auto; object-fit: contain; image-rendering: auto; }
+    #photoView figcaption { padding: 10px 14px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #9FB3A5; background: #050B07; border-top: 1px solid #1C2E21; }
+    #pvClose { position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 14px; z-index: 6; width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--accent); background: #050B07; color: #E6EDE7; cursor: pointer; }
+    #pvClose .icon { width: 22px; height: 22px; }
+    @media (max-width: 768px) { #photoView { padding: 72px 10px 16px; } #photoView img { max-width: 96vw; } }
+
     /* [A.E.R.O. UI] flight video: recorded drone video with the detector's boxes drawn over it */
     #videoView { position: fixed; inset: 0; z-index: 10050; display: none; flex-direction: column; background: var(--bg); color: var(--ink); }
     #videoView.open { display: flex; }
@@ -1589,8 +1628,44 @@
 </script>
 
 
+  <!-- [A.E.R.O. UI] drone close-up, full screen -->
+  <div id="photoView" class="glx-host" role="dialog" aria-modal="true" aria-label="Drone close-up, full screen">
+    <button id="pvClose" type="button" onclick="closePhoto()" aria-label="Close the photo"><svg class="icon"><use href="#i-x"/></svg></button>
+    <figure><img id="pvImg" alt=""><figcaption id="pvCap"></figcaption></figure>
+  </div>
+  <script>
+  // glitch a full-screen view in or out, like the loading screen (its ENTER exit and the dashboard's boot-in); done() runs at the end
+  function aeroGlitch(el, dir, done) {
+    let fx = el.querySelector(':scope > .glx-fx');
+    if (!fx) { fx = document.createElement('div'); fx.className = 'glx-fx'; fx.innerHTML = '<i class="gx-lines"></i><i class="gx-flash"></i><i class="gx-bar"></i><b class="gx-log"></b>'; el.appendChild(fx); }
+    (el._glxT || []).forEach(clearTimeout); el.classList.remove('glx-in', 'glx-exit', 'glx-off'); void el.offsetWidth;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { done && done(); return; }
+    const log = fx.querySelector('.gx-log'), at = (ms, f) => el._glxT.push(setTimeout(f, ms)); el._glxT = [];
+    if (dir === 'in') {
+      el.classList.add('glx-in');
+      ['> LINK', '> DECODE', '> OK'].forEach((t, i) => at(i * 120, () => { log.textContent = t; }));
+      at(1000, () => { el.classList.remove('glx-in'); done && done(); });
+    } else {
+      el.classList.add('glx-exit');
+      ['> CLOSING', '> RELEASE · OK'].forEach((t, i) => at(i * 150, () => { log.textContent = t; }));
+      at(360, () => el.classList.add('glx-off'));
+      at(860, () => { el.classList.remove('glx-exit', 'glx-off'); done && done(); });
+    }
+  }
+  function openPhoto() {
+    const src = document.getElementById('detailPhoto'), v = document.getElementById('photoView'); if (!src.src) return;
+    document.getElementById('pvImg').src = src.src; document.getElementById('pvImg').alt = src.alt;
+    document.getElementById('pvCap').innerText = document.getElementById('detailPhotoCap').innerText;
+    v.classList.add('open'); aeroGlitch(v, 'in');
+  }
+  function closePhoto() { const v = document.getElementById('photoView'); if (v.classList.contains('open')) aeroGlitch(v, 'out', () => v.classList.remove('open')); }
+  document.getElementById('detailPhoto').addEventListener('click', openPhoto);
+  document.getElementById('photoView').addEventListener('click', e => { if (e.target.id === 'photoView') closePhoto(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('photoView').classList.contains('open')) { e.stopImmediatePropagation(); closePhoto(); } }, true);
+  </script>
+
   <!-- [A.E.R.O. UI] flight video: recorded drone video + the detector's boxes (analyzed after landing, not live) -->
-  <div id="videoView" role="dialog" aria-modal="true" aria-labelledby="vvTitle">
+  <div id="videoView" class="glx-host" role="dialog" aria-modal="true" aria-labelledby="vvTitle">
     <div class="vv-head">
       <button class="vv-btn" onclick="closeVideo()"><svg class="icon"><use href="#i-back"/></svg>Map</button>
       <h2 id="vvTitle">Flight video</h2>
@@ -1615,8 +1690,8 @@
     document.getElementById('vvPick').innerHTML = vvList.map(v => `<option value="${v.name}">${v.title || v.name}</option>`).join('');
     document.getElementById('vvPick').style.display = vvList.length > 1 ? '' : 'none';
   }
-  function openVideo() { document.getElementById('videoView').classList.add('open'); if (!vvTrack && vvList.length) vvLoad(vvList[0].name); }
-  function closeVideo() { const v = document.getElementById('vvVideo'); v.pause(); document.getElementById('videoView').classList.remove('open'); }
+  function openVideo() { const w = document.getElementById('videoView'); w.classList.add('open'); aeroGlitch(w, 'in'); if (!vvTrack && vvList.length) vvLoad(vvList[0].name); }
+  function closeVideo() { const v = document.getElementById('vvVideo'), w = document.getElementById('videoView'); v.pause(); if (w.classList.contains('open')) aeroGlitch(w, 'out', () => w.classList.remove('open')); }
   function vvToggleWeak() { vvWeakOn = !vvWeakOn; document.getElementById('vvWeak').setAttribute('aria-pressed', vvWeakOn); vvTimeline(); vvDraw(); }
   async function vvLoad(name) {
     const meta = vvList.find(v => v.name === name); if (!meta) return;
